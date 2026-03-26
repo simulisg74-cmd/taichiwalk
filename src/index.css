@@ -3,6 +3,12 @@
 @tailwind utilities;
 
 @layer base {
+  /* Step 12: tas pats fonas kaip theme-color – mažiau „flash“ prieš hidrantą ir per perėjimus */
+  html,
+  body {
+    background-color: #ffffff;
+    color-scheme: light;
+  }
   /* iOS: nekeisti šrifto mastelio automatiškai; išvengti horizontalios slinkties nuo w-screen / hero */
   html {
     -webkit-text-size-adjust: 100%;

@@ -1,0 +1,71 @@
+{
+  "quiz": {
+    "common": {
+      "continue": "Tęsti"
+    },
+    "splash": {
+      "leadIn": "Ženkite pirmą žingsnį",
+      "titleLine1": "Tai Chi:",
+      "titleLine2": "Transformuok",
+      "titleLine3": "savo EISĄ!",
+      "loadingLabel": "Kraunama apklausa"
+    },
+    "gender": {
+      "title": "Kokia jūsų ",
+      "titleAccent": "lytis?",
+      "subtitle": "Ši informacija padės sudaryti jums tinkamą programą",
+      "female": "Moteris",
+      "male": "Vyras"
+    },
+    "trust": {
+      "headlineFemale": "10 milijonų moterų",
+      "headlineMale": "10 milijonų vyrų",
+      "subline": "pasitiki Walking savo fitneso tikslais",
+      "sublineRich": "pasitiki <w>Walking</w> savo fitneso tikslais",
+      "heroAltFemale": "Moterys Walking programoje",
+      "heroAltMale": "Vyrai Walking programoje"
+    },
+    "age": {
+      "heading": "Personalizuotas Tai Chi vaikščiojimo planas",
+      "basedOnAge": "Pagal jūsų amžių",
+      "subheading": "Pasirinkite amžiaus grupę",
+      "option4049": "Amžius: 40–49",
+      "option5059": "Amžius: 50–59",
+      "option6069": "Amžius: 60–69",
+      "option7080": "Amžius: 70–80"
+    },
+    "goals": {
+      "title": "Ko norite pasiekti?",
+      "hint": "Pasirinkite bet kiek tikslų",
+      "validation": "Norėdami tęsti, pasirinkite bent vieną tikslą",
+      "lose_weight": "Numesti svorio",
+      "heart_health": "Pagerinti širdies sveikatą",
+      "flexibility": "Išvystyti lankstumą",
+      "self_esteem": "Pagerinti savivertę ir mylėti savo kūną",
+      "stay_fit": "Išlikti sportišku",
+      "reduce_stress": "Mažinti stresą",
+      "firm_toned": "Stangrumas ir tonas"
+    },
+    "exactAge": {
+      "title": "Kiek jums metų?",
+      "subtitle": "Pritaikysime patirtį pagal tai"
+    }
+  },
+  "common": {
+    "back": "Atgal",
+    "menu": "Meniu",
+    "closeMenu": "Uždaryti meniu",
+    "termsOfUse": "Naudojimo sąlygos",
+    "privacyPolicy": "Privatumo politika",
+    "emailUs": "Rašykite mums",
+    "menuSr": "Meniu",
+    "redirecting": "Nukreipiama…",
+    "offerMissing": "Šiam keliui nėra pasiūlymo konfigūracijos.",
+    "noPlans": "Planų parinkčių nėra.",
+    "switchToEn": "English",
+    "switchToLt": "Lietuvių"
+  },
+  "brand": {
+    "walking": "Walking"
+  }
+}

@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useParams, Link, useLocation } from 'react-router-dom';
+import { useTranslation, Trans } from 'react-i18next';
 import WalkingIcon from './WalkingIcon';
-import PlanOfferLanding from './PlanOfferLanding';
+import { withPreservedQueryParams } from '../utils/preserveQueryParams';
+import { buildLocalizedOfferPath, swapLangInPath } from '../utils/localizedPath';
 import {
   HelpCircle,
   CheckCircle,
@@ -135,6 +138,9 @@ import seniorCoupleHeroImage from '../assets/img senokas su mociute.png';
 import firstPageBackgroundImage from '../assets/pirmas puslapis.webp';
 import laurelLeftSvg from '../assets/sakele is kaires.svg';
 import taiChiPromoMaleHeroImage from '../assets/men ant kilimelio istieses rankas.jpg';
+import quizConfig from '../configs/quizConfig.json';
+import offerConfig from '../configs/offerConfig.json';
+import { writeQuizProgress } from '../utils/quizStorage';
 
 /** Amžiaus kortelės – vietinės nuotraukos (baltas fonas), eilė: 40–49 … 70–80 */
 const FEMALE_AGE_IMAGES = {
@@ -241,11 +247,8 @@ const TOTAL_QUIZ_STEPS = 49;
 /** Didžiausias galimas step numeris (Step 52 – pasiūlymo landingas po „Thank you“) */
 const MAX_QUIZ_STEP = 52;
 
-/**
- * Vyriška šaka: kol `false` – Step 2 rodomas tik „Female“, visa eiga = moterų assetai / copy.
- * Vyrams sutvarkius – įjunk į `true` (Male mygtukas ir visi `gender === 'male'` šakos veiks kaip dabar).
- */
-const QUIZ_MALE_BRANCH_ENABLED = true;
+/** Iš quizConfig.json – vyriškos šakos įjungimas (Step 2 ir visi `gender === 'male'` variantai) */
+const QUIZ_MALE_BRANCH_ENABLED = quizConfig.features?.maleBranchEnabled ?? true;
 
 /**
  * Progreso juosta pagal tikrąją pirmyn eigą (1 … TOTAL_QUIZ_STEPS).
@@ -275,11 +278,16 @@ const QUIZ_ICON_CLASS = 'text-blue-500 shrink-0';
 // Step 2 lyties ekranas – terrakota (reference screenshot)
 const GENDER_ACCENT_CLASS = 'text-[#c85a3c]';
 
-/** Palaikymo el. paštas – meniu „Email“ mygtukas (sutampa su PlanOfferLanding) */
-const QUIZ_SUPPORT_EMAIL = 'support@walkingfl.fit';
+/** Palaikymo el. paštas – iš offerConfig.json */
+const QUIZ_SUPPORT_EMAIL = offerConfig.urls.supportEmail;
 
-/** Šoninis meniu – Terms, Privacy, Help (iš dešinės, su backdrop) */
+/** Šoninis meniu – Terms, Privacy, Help + kalbos jungiklis (query išsaugomas) */
 function QuizMenuDrawer({ open, onClose }) {
+  const { t, i18n } = useTranslation();
+  const location = useLocation();
+  const otherLang = i18n.language?.startsWith('lt') ? 'en' : 'lt';
+  const langSwitchTo = withPreservedQueryParams(swapLangInPath(location.pathname, otherLang));
+
   if (!open) return null;
 
   return (
@@ -288,7 +296,7 @@ function QuizMenuDrawer({ open, onClose }) {
         type="button"
         className="absolute inset-0 bg-black/40"
         onClick={onClose}
-        aria-label="Uždaryti meniu"
+        aria-label={t('common.closeMenu')}
       />
       <aside className="relative ml-auto flex h-full w-full max-w-sm flex-col bg-white pb-[env(safe-area-inset-bottom,0px)] pt-[env(safe-area-inset-top,0px)] shadow-2xl">
         <div className="flex shrink-0 items-start p-4">
@@ -296,28 +304,37 @@ function QuizMenuDrawer({ open, onClose }) {
             type="button"
             onClick={onClose}
             className="flex h-10 w-10 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-            aria-label="Uždaryti meniu"
+            aria-label={t('common.closeMenu')}
           >
             <X size={22} weight="bold" />
           </button>
         </div>
         <h2 id="quiz-menu-title" className="sr-only">
-          Meniu
+          {t('common.menuSr')}
         </h2>
         <nav className="flex flex-col gap-8 px-6 pb-10 pt-2">
+          <div className="flex gap-4 border-b border-gray-100 pb-6">
+            <Link
+              to={langSwitchTo}
+              className="text-sm font-semibold text-orange-600 underline-offset-2 hover:underline"
+              onClick={onClose}
+            >
+              {otherLang === 'lt' ? t('common.switchToLt') : t('common.switchToEn')}
+            </Link>
+          </div>
           <a
             href="#terms"
             className="text-lg font-medium text-slate-800 transition-colors hover:text-orange-600"
             onClick={onClose}
           >
-            Terms of Use
+            {t('common.termsOfUse')}
           </a>
           <a
             href="#privacy"
             className="text-lg font-medium text-slate-800 transition-colors hover:text-orange-600"
             onClick={onClose}
           >
-            Privacy Policy
+            {t('common.privacyPolicy')}
           </a>
           <div className="flex flex-col items-stretch gap-2">
             <a
@@ -326,7 +343,7 @@ function QuizMenuDrawer({ open, onClose }) {
               onClick={onClose}
             >
               <Envelope size={22} weight="fill" className="shrink-0" aria-hidden />
-              Email us
+              {t('common.emailUs')}
             </a>
             <a
               href={`mailto:${QUIZ_SUPPORT_EMAIL}`}
@@ -344,7 +361,7 @@ function QuizMenuDrawer({ open, onClose }) {
 
 // Bendras mygtuko stilius – pilulės forma, oranžinis, centruotas (kaip reference)
 const QUIZ_BUTTON_BASE =
-  'inline-flex items-center justify-center rounded-full px-12 py-3.5 text-base font-semibold text-white transition-all active:scale-[0.98]';
+  'inline-flex w-full max-w-[min(100%,20rem)] items-center justify-center rounded-full px-6 py-3.5 text-base font-semibold text-white transition-all active:scale-[0.98] sm:w-auto sm:max-w-none sm:px-10 md:px-12';
 const CONTINUE_BUTTON_CLASSES =
   QUIZ_BUTTON_BASE +
   ' disabled:cursor-not-allowed disabled:bg-gray-300 disabled:opacity-90 enabled:bg-orange-500 enabled:hover:bg-orange-600';
@@ -375,8 +392,25 @@ const QUIZ_OPTION_CHECK_ICON = 'text-orange-600';
 
 /** Step 2 – lyties mygtukai */
 const QUIZ_OPTION_GENDER_ROW =
-  'flex cursor-pointer items-center gap-4 rounded-2xl border border-gray-200/90 bg-white px-6 py-[1.125rem] text-left shadow-[0_1px_3px_rgba(0,0,0,0.06)] ' +
+  'flex min-w-0 w-full cursor-pointer items-center gap-3 rounded-2xl border border-gray-200/90 bg-white px-4 py-[1.125rem] text-left shadow-[0_1px_3px_rgba(0,0,0,0.06)] sm:gap-4 sm:px-6 ' +
   QUIZ_OPTION_INTERACTIVE;
+
+/** Step 11: bazinis offer su kalbos prefiksu ir išsaugotais query + `tw`. */
+function Step52OfferRedirect({ targetWeightKg }) {
+  const { lang } = useParams();
+  const navigate = useNavigate();
+  const { t } = useTranslation();
+  useEffect(() => {
+    const seg = offerConfig.variants?.base?.pathSegment ?? 'offer';
+    const basePath = buildLocalizedOfferPath(lang ?? 'en', seg);
+    navigate(withPreservedQueryParams(basePath, { tw: String(targetWeightKg) }), { replace: true });
+  }, [navigate, targetWeightKg, lang]);
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-white text-sm text-gray-500">
+      {t('common.redirecting')}
+    </div>
+  );
+}
 
 /**
  * Quiz komponentas – kelių žingsnių apklausa (multi-step quiz).
@@ -384,14 +418,17 @@ const QUIZ_OPTION_GENDER_ROW =
  * Step 2: Baltas fonas, header, klausimas „What is your gender?“ (vyrams – tik jei QUIZ_MALE_BRANCH_ENABLED).
  * Step 3: Dinaminis turinys pagal lytį – moterys/vyrai su nuotrauka ir Continue mygtuku.
  */
-function Quiz() {
-  const [step, setStep] = useState(1);
+function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] } = {}) {
+  const { t } = useTranslation();
+  const { t: tLegacy } = useTranslation('legacy');
+  const { t: tOffer } = useTranslation('offer');
+  const [step, setStep] = useState(initialStep);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  /** Step 1: nuo pat pradžios rodomas automatinis užkrovimas */
-  const [isLoading, setIsLoading] = useState(true);
+  /** Step 1: nuo pat pradžios rodomas automatinis užkrovimas (tik jei pradedama nuo 1 žingsnio) */
+  const [isLoading, setIsLoading] = useState(initialStep === 1);
   const [progress, setProgress] = useState(0);
-  const [gender, setGender] = useState('');
-  const [selectedGoals, setSelectedGoals] = useState([]);
+  const [gender, setGender] = useState(initialGender);
+  const [selectedGoals, setSelectedGoals] = useState(initialSelectedGoals);
   const [bodyType, setBodyType] = useState('');
   const [dreamBody, setDreamBody] = useState('');
   const [selectedFocusAreas, setSelectedFocusAreas] = useState([]);
@@ -431,6 +468,22 @@ function Quiz() {
   const [userExactAge, setUserExactAge] = useState(null);
   /** Step 43: animuojamas procentas kuriant planą */
   const [planBuildPercent, setPlanBuildPercent] = useState(PLAN_BUILD_START_PERCENT);
+
+  /** Step 9: legacy + offer progresas į localStorage (3 min / 12 h prie offer) */
+  useEffect(() => {
+    writeQuizProgress(
+      {
+        phase: 'legacy',
+        legacyStarted: true,
+        legacyStep: step,
+        answers: {
+          gender,
+          goals: selectedGoals,
+        },
+      },
+      { offerReached: step === 52 },
+    );
+  }, [step, gender, selectedGoals]);
 
   const handleGenderSelect = useCallback((selectedGender) => {
     setGender(selectedGender);
@@ -816,11 +869,11 @@ function Quiz() {
     return () => clearInterval(interval);
   }, [isLoading]);
 
-  // Step 52: Plasmic purchase tipo landingas (Tailwind + vietinės nuotraukos)
+  // Step 52: nukreipimas į offer maršrutą (query išsaugomi per withPreservedQueryParams)
   if (step === 52) {
     const goalNum = Number(String(goalWeight).replace(',', '.'));
     const targetKg = Number.isFinite(goalNum) && goalNum > 0 ? goalNum : 85;
-    return <PlanOfferLanding targetWeightKg={targetKg} promoCode="Gintas mar2026" />;
+    return <Step52OfferRedirect targetWeightKg={targetKg} />;
   }
 
   // Step 1: Pradinis langas su fonine nuotrauka + automatinis užkrovimas
@@ -841,15 +894,15 @@ function Quiz() {
 
           <div className="flex min-h-0 flex-1 flex-col justify-end pb-6 pt-6 sm:pb-10 sm:pt-10">
             <h1 className="text-center text-3xl font-bold leading-tight tracking-tight text-white drop-shadow-lg sm:text-4xl sm:leading-tight">
-              <span className="block">Take the first step in</span>
-              <span className="mt-1 block sm:mt-2">Tai Chi: Transform</span>
-              <span className="mt-1 block sm:mt-2">Your WALK!</span>
+              <span className="block">{t('quiz.splash.leadIn')}</span>
+              <span className="mt-1 block sm:mt-2">{t('quiz.splash.titleLine2')}</span>
+              <span className="mt-1 block sm:mt-2">{t('quiz.splash.titleLine3')}</span>
             </h1>
           </div>
 
           <div className="w-full shrink-0 space-y-2 pb-6">
             <p className="flex items-center justify-center gap-1 text-sm font-medium text-white/95 drop-shadow">
-              Loading the quiz
+              {t('quiz.splash.loadingLabel')}
               <CaretDown className="h-4 w-4 shrink-0" weight="bold" aria-hidden />
             </p>
             <div className="relative mx-auto h-14 w-full max-w-md overflow-hidden rounded-full bg-black/50 shadow-inner ring-1 ring-white/10">
@@ -894,7 +947,7 @@ function Quiz() {
             type="button"
             onClick={goBack}
             className="flex h-10 w-10 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-50"
-            aria-label="Atgal"
+            aria-label={t('common.back')}
           >
             <CaretLeft size={24} weight="bold" className="text-gray-500" />
           </button>
@@ -905,7 +958,7 @@ function Quiz() {
             type="button"
             onClick={() => setIsMenuOpen(true)}
             className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-gray-600 transition-colors hover:bg-gray-50"
-            aria-label="Meniu"
+            aria-label={t('common.menu')}
           >
             <List size={24} weight="bold" className="text-gray-600" />
           </button>
@@ -937,11 +990,10 @@ function Quiz() {
       <div className="w-full max-w-md space-y-8">
         <div className="space-y-3 text-center">
           <h2 className="text-2xl font-semibold leading-tight text-gray-900 md:text-[1.75rem]">
-            What is your <span className={`font-semibold ${GENDER_ACCENT_CLASS}`}>gender?</span>
+            {t('quiz.gender.title')}
+            <span className={`font-semibold ${GENDER_ACCENT_CLASS}`}>{t('quiz.gender.titleAccent')}</span>
           </h2>
-          <p className="text-sm leading-relaxed text-gray-500">
-            This information will help us create a suitable program for you
-          </p>
+          <p className="text-sm leading-relaxed text-gray-500">{t('quiz.gender.subtitle')}</p>
         </div>
 
         <div className="flex flex-col gap-4">
@@ -953,7 +1005,7 @@ function Quiz() {
             <span className="pointer-events-none flex h-10 w-10 shrink-0 items-center justify-center">
               <GenderFemale size={36} weight="fill" className={GENDER_ACCENT_CLASS} />
             </span>
-            <span className="pointer-events-none font-bold text-gray-900">Female</span>
+            <span className="pointer-events-none font-bold text-gray-900">{t('quiz.gender.female')}</span>
           </button>
           {QUIZ_MALE_BRANCH_ENABLED ? (
             <button
@@ -964,12 +1016,10 @@ function Quiz() {
               <span className="pointer-events-none flex h-10 w-10 shrink-0 items-center justify-center">
                 <GenderMale size={36} weight="fill" className={GENDER_ACCENT_CLASS} />
               </span>
-              <span className="pointer-events-none font-bold text-gray-900">Male</span>
+              <span className="pointer-events-none font-bold text-gray-900">{t('quiz.gender.male')}</span>
             </button>
           ) : (
-            <p className="text-center text-xs leading-relaxed text-gray-400">
-              Men&apos;s program — we&apos;re polishing it next; this flow is tailored for women.
-            </p>
+            <p className="text-center text-xs leading-relaxed text-gray-400">{tLegacy('maleProgramNote')}</p>
           )}
         </div>
       </div>
@@ -979,7 +1029,7 @@ function Quiz() {
   // Step 3: Dinaminis turinys pagal lytį – kompaktiškas tekstas + nuotrauka (kaip reference)
   if (step === 3) {
     const isFemale = gender !== 'male'; // fallback į female jei gender tuščias
-    const titleLine = isFemale ? '10 million women' : '10 million men';
+    const titleLine = isFemale ? t('quiz.trust.headlineFemale') : t('quiz.trust.headlineMale');
     const imageSrc = isFemale ? threeWomenHeroImage : threeMenHeroImage;
 
     return (
@@ -991,7 +1041,7 @@ function Quiz() {
             type="button"
             onClick={() => setStep(2)}
             className="flex h-10 w-10 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-            aria-label="Atgal"
+            aria-label={t('common.back')}
           >
             <CaretLeft size={24} weight="bold" className="text-gray-600" />
           </button>
@@ -1001,7 +1051,7 @@ function Quiz() {
           <button
             type="button"
             className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-            aria-label="Meniu"
+            aria-label={t('common.menu')}
             onClick={() => setIsMenuOpen(true)}
           >
             <List size={24} weight="bold" className="text-gray-600" />
@@ -1042,14 +1092,16 @@ function Quiz() {
                 />
               </div>
               <p className="mt-4 text-base font-normal leading-snug text-gray-600 sm:text-xl">
-                trust <span className="font-semibold text-gray-800">Walking</span> with their fitness
-                goals
+                <Trans
+                  i18nKey="quiz.trust.sublineRich"
+                  components={{ w: <span className="font-semibold text-gray-800" /> }}
+                />
               </p>
             </div>
             <div className="w-full max-w-[22rem] shrink-0 sm:max-w-[26rem] md:max-w-[29rem]">
               <img
                 src={imageSrc}
-                alt={isFemale ? 'Moterys Walking programoje' : 'Vyrai Walking programoje'}
+                alt={isFemale ? t('quiz.trust.heroAltFemale') : t('quiz.trust.heroAltMale')}
                 className="h-auto w-full object-contain object-center"
                 loading="lazy"
                 decoding="async"
@@ -1064,9 +1116,8 @@ function Quiz() {
             type="button"
             onClick={handleContinue}
             className={CONTINUE_BUTTON_ALWAYS_ENABLED}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>
       <QuizMenuDrawer open={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
@@ -1078,10 +1129,10 @@ function Quiz() {
   if (step === 4) {
     const ageImages = gender === 'male' ? MALE_AGE_IMAGES : FEMALE_AGE_IMAGES;
     const AGE_OPTIONS = [
-      { range: '40-49', label: 'Age: 40-49' },
-      { range: '50-59', label: 'Age: 50-59' },
-      { range: '60-69', label: 'Age: 60-69' },
-      { range: '70-80', label: 'Age: 70-80' },
+      { range: '40-49', labelKey: 'quiz.age.option4049' },
+      { range: '50-59', labelKey: 'quiz.age.option5059' },
+      { range: '60-69', labelKey: 'quiz.age.option6069' },
+      { range: '70-80', labelKey: 'quiz.age.option7080' },
     ];
 
     return (
@@ -1093,7 +1144,7 @@ function Quiz() {
             type="button"
             onClick={() => setStep(3)}
             className="flex h-10 w-10 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-            aria-label="Atgal"
+            aria-label={t('common.back')}
           >
             <CaretLeft size={24} weight="bold" className="text-gray-600" />
           </button>
@@ -1103,7 +1154,7 @@ function Quiz() {
           <button
             type="button"
             className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-            aria-label="Meniu"
+            aria-label={t('common.menu')}
             onClick={() => setIsMenuOpen(true)}
           >
             <List size={24} weight="bold" className="text-gray-600" />
@@ -1121,10 +1172,10 @@ function Quiz() {
         {/* Turinys */}
         <main className="flex flex-col items-center px-6 py-8">
           <h2 className="text-center text-lg font-bold uppercase tracking-wide text-gray-900">
-            Personalized Tai Chi Walking Plan
+            {t('quiz.age.heading')}
           </h2>
           <p className="mt-1 text-center text-sm font-medium uppercase tracking-wide text-gray-500">
-            Based on your age
+            {t('quiz.age.basedOnAge')}
           </p>
 
           {/* 2x2 amžiaus kortelės – kompaktiškos (~pusė ankstesnio), portretas baltame fone, oranžinė „piliulė“ */}
@@ -1144,7 +1195,7 @@ function Quiz() {
                   />
                 </div>
                 <div className="relative z-10 -mt-2.5 mx-1.5 mb-1 flex min-h-[2.25rem] items-center justify-between gap-2 rounded-full bg-orange-500 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-sm sm:px-3 sm:text-xs">
-                  <span className="truncate">{option.label}</span>
+                  <span className="truncate">{t(option.labelKey)}</span>
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white sm:h-6 sm:w-6">
                     <CaretRight size={14} weight="bold" className="text-orange-500" />
                   </span>
@@ -1159,7 +1210,7 @@ function Quiz() {
             onClick={() => handleAgeSelect('18-39')}
             className="mt-6 text-sm font-semibold text-gray-900 underline-offset-2 hover:underline"
           >
-            I&apos;m 18-39 &gt;
+            {tLegacy('ageLink1839')}
           </button>
         </main>
       </div>
@@ -1180,12 +1231,12 @@ function Quiz() {
     return renderQuizStepLayout(
       <div className="flex w-full max-w-md flex-col gap-8">
         <div className="space-y-2 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">How old are you?</h2>
-          <p className="text-sm text-gray-500">We&apos;ll tailor your experience accordingly</p>
+          <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">{t('quiz.exactAge.title')}</h2>
+          <p className="text-sm text-gray-500">{t('quiz.exactAge.subtitle')}</p>
         </div>
 
         <label className="sr-only" htmlFor="quiz-exact-age">
-          Your age in years
+          {tLegacy('exactAgeSr')}
         </label>
         <input
           id="quiz-exact-age"
@@ -1208,9 +1259,8 @@ function Quiz() {
             onClick={handleExactAgeContinue}
             disabled={!exactAgeValid}
             className={CONTINUE_BUTTON_CLASSES}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>,
       { backStep: 34 },
@@ -1282,7 +1332,7 @@ function Quiz() {
         {!hasSelectedGoals && (
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
             <LucideXCircle size={20} className="text-blue-500 shrink-0" />
-            <span className="text-sm font-medium">Please select at least one goal to continue</span>
+            <span className="text-sm font-medium">{tLegacy('validation.selectGoal')}</span>
           </div>
         )}
 
@@ -1293,9 +1343,8 @@ function Quiz() {
             onClick={handleGoalsContinue}
             disabled={!hasSelectedGoals}
             className={CONTINUE_BUTTON_CLASSES}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>,
       { backStep: 4 },
@@ -1358,7 +1407,7 @@ function Quiz() {
         {!hasSelectedBodyType && (
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
             <LucideXCircle size={20} className="text-blue-500 shrink-0" />
-            <span className="text-sm font-medium">Please select your body type to continue</span>
+            <span className="text-sm font-medium">{tLegacy('validation.selectBodyType')}</span>
           </div>
         )}
 
@@ -1369,9 +1418,8 @@ function Quiz() {
             onClick={handleBodyTypeContinue}
             disabled={!hasSelectedBodyType}
             className={CONTINUE_BUTTON_CLASSES}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>
     );
@@ -1441,7 +1489,7 @@ function Quiz() {
         {!hasSelectedDreamBody && (
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
             <LucideXCircle size={20} className="text-blue-500 shrink-0" />
-            <span className="text-sm font-medium">Please select your dream body to continue</span>
+            <span className="text-sm font-medium">{tLegacy('validation.selectDreamBody')}</span>
           </div>
         )}
 
@@ -1451,9 +1499,8 @@ function Quiz() {
             onClick={handleDreamBodyContinue}
             disabled={!hasSelectedDreamBody}
             className={CONTINUE_BUTTON_CLASSES}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>
     );
@@ -1533,7 +1580,7 @@ function Quiz() {
         {!hasSelectedAreas && (
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
             <LucideXCircle size={20} className="text-blue-500 shrink-0" />
-            <span className="text-sm font-medium">Please select at least one area to continue</span>
+            <span className="text-sm font-medium">{tLegacy('validation.selectArea')}</span>
           </div>
         )}
 
@@ -1543,9 +1590,8 @@ function Quiz() {
             onClick={handleFocusAreasContinue}
             disabled={!hasSelectedAreas}
             className={CONTINUE_BUTTON_CLASSES}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>
     );
@@ -1616,7 +1662,7 @@ function Quiz() {
         {!hasSelected && (
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
             <LucideXCircle size={20} className="text-blue-500 shrink-0" />
-            <span className="text-sm font-medium">Please select an option to continue</span>
+            <span className="text-sm font-medium">{tLegacy('validation.selectOption')}</span>
           </div>
         )}
 
@@ -1626,9 +1672,8 @@ function Quiz() {
             onClick={handleCelluliteContinue}
             disabled={!hasSelected}
             className={CONTINUE_BUTTON_CLASSES}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>
     );
@@ -1690,7 +1735,7 @@ function Quiz() {
           {!hasSelected && (
             <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
               <LucideXCircle size={20} className="text-blue-500 shrink-0" />
-              <span className="text-sm font-medium">Please select an option to continue</span>
+              <span className="text-sm font-medium">{tLegacy('validation.selectOption')}</span>
             </div>
           )}
 
@@ -1700,9 +1745,8 @@ function Quiz() {
               onClick={handleBestShapeContinue}
               disabled={!hasSelected}
               className={CONTINUE_BUTTON_CLASSES}
-            >
-              Continue
-            </button>
+            >{t('quiz.common.continue')}
+          </button>
           </div>
         </div>
       </div>
@@ -1772,7 +1816,7 @@ function Quiz() {
           {!hasSelected && (
             <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
               <LucideXCircle size={20} className="text-blue-500 shrink-0" />
-              <span className="text-sm font-medium">Please select an option to continue</span>
+              <span className="text-sm font-medium">{tLegacy('validation.selectOption')}</span>
             </div>
           )}
 
@@ -1782,9 +1826,8 @@ function Quiz() {
               onClick={handleWeightFluctuationsContinue}
               disabled={!hasSelected}
               className={CONTINUE_BUTTON_CLASSES}
-            >
-              Continue
-            </button>
+            >{t('quiz.common.continue')}
+          </button>
           </div>
         </div>
       </div>
@@ -1807,7 +1850,7 @@ function Quiz() {
             type="button"
             onClick={() => setStep(11)}
             className="flex h-10 w-10 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-            aria-label="Atgal"
+            aria-label={t('common.back')}
           >
             <CaretLeft size={24} weight="bold" className="text-gray-600" />
           </button>
@@ -1817,7 +1860,7 @@ function Quiz() {
           <button
             type="button"
             className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-            aria-label="Meniu"
+            aria-label={t('common.menu')}
             onClick={() => setIsMenuOpen(true)}
           >
             <List size={24} weight="bold" className="text-gray-600" />
@@ -1906,9 +1949,8 @@ function Quiz() {
             type="button"
             onClick={handleHarvardInfoContinue}
             className={CONTINUE_BUTTON_ALWAYS_ENABLED}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>
       <QuizMenuDrawer open={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
@@ -1975,7 +2017,7 @@ function Quiz() {
         {!hasSelected && (
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
             <LucideXCircle size={20} className="text-blue-500 shrink-0" />
-            <span className="text-sm font-medium">Please select an option to continue</span>
+            <span className="text-sm font-medium">{tLegacy('validation.selectOption')}</span>
           </div>
         )}
 
@@ -1985,9 +2027,8 @@ function Quiz() {
             onClick={handleStairsContinue}
             disabled={!hasSelected}
             className={CONTINUE_BUTTON_CLASSES}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>
     );
@@ -2008,7 +2049,7 @@ function Quiz() {
             type="button"
             onClick={() => setStep(13)}
             className="flex h-10 w-10 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-            aria-label="Atgal"
+            aria-label={t('common.back')}
           >
             <CaretLeft size={24} weight="bold" className="text-gray-600" />
           </button>
@@ -2018,7 +2059,7 @@ function Quiz() {
           <button
             type="button"
             className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-            aria-label="Meniu"
+            aria-label={t('common.menu')}
             onClick={() => setIsMenuOpen(true)}
           >
             <List size={24} weight="bold" className="text-gray-600" />
@@ -2067,9 +2108,8 @@ function Quiz() {
               type="button"
               onClick={handleTaiChiPromoContinue}
               className={CONTINUE_BUTTON_ALWAYS_ENABLED}
-            >
-              Continue
-            </button>
+            >{t('quiz.common.continue')}
+          </button>
           </div>
         </div>
       </div>
@@ -2090,7 +2130,7 @@ function Quiz() {
             type="button"
             onClick={() => setStep(23)}
             className="flex h-10 w-10 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-            aria-label="Atgal"
+            aria-label={t('common.back')}
           >
             <CaretLeft size={24} weight="bold" className="text-gray-600" />
           </button>
@@ -2100,7 +2140,7 @@ function Quiz() {
           <button
             type="button"
             className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-            aria-label="Meniu"
+            aria-label={t('common.menu')}
             onClick={() => setIsMenuOpen(true)}
           >
             <List size={24} weight="bold" className="text-gray-600" />
@@ -2510,7 +2550,7 @@ function Quiz() {
         {!hasSelected && (
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
             <LucideXCircle size={20} className="text-blue-500 shrink-0" />
-            <span className="text-sm font-medium">Please select at least one option to continue</span>
+            <span className="text-sm font-medium">{tLegacy('validation.selectAtLeastOne')}</span>
           </div>
         )}
 
@@ -2520,9 +2560,8 @@ function Quiz() {
             onClick={handleActivitiesContinue}
             disabled={!hasSelected}
             className={CONTINUE_BUTTON_CLASSES}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>
     );
@@ -2637,7 +2676,7 @@ function Quiz() {
         {!hasSelected && (
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
             <LucideXCircle size={20} className="text-blue-500 shrink-0" />
-            <span className="text-sm font-medium">Please select at least one option to continue</span>
+            <span className="text-sm font-medium">{tLegacy('validation.selectAtLeastOne')}</span>
           </div>
         )}
 
@@ -2647,9 +2686,8 @@ function Quiz() {
             onClick={handleExercisePreferenceContinue}
             disabled={!hasSelected}
             className={CONTINUE_BUTTON_CLASSES}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>,
       { backStep: 19 },
@@ -2898,7 +2936,7 @@ function Quiz() {
             <button
               type="button"
               onClick={handleTransformationContinue}
-              className={`${CONTINUE_BUTTON_ALWAYS_ENABLED} min-w-[200px] bg-[#FF7A45] hover:bg-[#e86a38]`}
+              className={`${CONTINUE_BUTTON_ALWAYS_ENABLED} bg-[#FF7A45] hover:bg-[#e86a38]`}
             >
               Let&apos;s Do It!
             </button>
@@ -2979,7 +3017,7 @@ function Quiz() {
         {!hasSelected && (
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
             <LucideXCircle size={20} className="text-blue-500 shrink-0" />
-            <span className="text-sm font-medium">Please select at least one option to continue</span>
+            <span className="text-sm font-medium">{tLegacy('validation.selectAtLeastOne')}</span>
           </div>
         )}
 
@@ -2989,9 +3027,8 @@ function Quiz() {
             onClick={handleWeightGainEventsContinue}
             disabled={!hasSelected}
             className={CONTINUE_BUTTON_CLASSES}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>
     );
@@ -3126,9 +3163,8 @@ function Quiz() {
             type="button"
             onClick={handleLongTermResultsContinue}
             className={CONTINUE_BUTTON_ALWAYS_ENABLED}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>
     );
@@ -3199,9 +3235,8 @@ function Quiz() {
             onClick={handleHeightContinue}
             disabled={!hasValidHeight}
             className={CONTINUE_BUTTON_CLASSES}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>
     );
@@ -3250,9 +3285,8 @@ function Quiz() {
             onClick={handleCurrentWeightContinue}
             disabled={!hasValidWeight}
             className={CONTINUE_BUTTON_CLASSES}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>
     );
@@ -3302,9 +3336,8 @@ function Quiz() {
             onClick={handleGoalWeightContinue}
             disabled={!hasValidGoal}
             className={CONTINUE_BUTTON_CLASSES}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>
     );
@@ -3435,12 +3468,12 @@ function Quiz() {
             <span className="w-[22%] text-right">40</span>
           </div>
 
-          {/* Kategorijų etiketės */}
-          <div className="mt-1 flex w-full text-[9px] font-bold uppercase leading-tight tracking-wide text-gray-400">
-            <span className="w-[14%] text-left">Underweight</span>
-            <span className="w-[26%] text-center">Normal</span>
-            <span className="w-[20%] text-center">Overweight</span>
-            <span className="w-[40%] text-right">Obese</span>
+          {/* Kategorijų etiketės – siauri stulpeliai: leidžiame laužyti eilutę 375px */}
+          <div className="mt-1 flex w-full text-[7px] font-bold uppercase leading-tight tracking-wide text-gray-400 sm:text-[9px]">
+            <span className="w-[14%] break-words text-left">Underweight</span>
+            <span className="w-[26%] break-words text-center">Normal</span>
+            <span className="w-[20%] break-words text-center">Overweight</span>
+            <span className="w-[40%] break-words text-right">Obese</span>
           </div>
 
           {bmi && Number(bmi) >= 25 && (
@@ -3502,13 +3535,13 @@ function Quiz() {
           </div>
         </div>
 
-        <div className="flex justify-center">
+        <div className="flex w-full justify-center px-1">
           <button
             type="button"
             onClick={handleProfileContinue}
-            className={`${CONTINUE_BUTTON_ALWAYS_ENABLED} min-w-[200px] px-14`}
+            className={CONTINUE_BUTTON_ALWAYS_ENABLED}
           >
-            Continue
+            {t('quiz.common.continue')}
           </button>
         </div>
       </div>,
@@ -3612,7 +3645,7 @@ function Quiz() {
             disabled={!motivationEventDate}
             className={CONTINUE_BUTTON_CLASSES}
           >
-            Continue
+            {t('quiz.common.continue')}
           </button>
           <button
             type="button"
@@ -3836,9 +3869,8 @@ function Quiz() {
             type="button"
             onClick={handlePredictionContinue}
             className={CONTINUE_BUTTON_ALWAYS_ENABLED}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>,
       {
@@ -3947,7 +3979,7 @@ function Quiz() {
           <button
             type="button"
             onClick={handleSustainableChangeGotIt}
-            className="mt-2 rounded-full bg-[#ff6b4a] px-12 py-3.5 text-base font-semibold text-white shadow-lg transition-colors hover:bg-[#f05538] active:scale-[0.98]"
+            className="mt-2 w-full max-w-[min(100%,20rem)] rounded-full bg-[#ff6b4a] px-6 py-3.5 text-base font-semibold text-white shadow-lg transition-colors hover:bg-[#f05538] active:scale-[0.98] sm:w-auto sm:max-w-none sm:px-10 md:px-12"
           >
             Got it
           </button>
@@ -4033,9 +4065,8 @@ function Quiz() {
             onClick={handleGetPlanContinue}
             disabled={!valid}
             className={CONTINUE_BUTTON_CLASSES}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>,
       { backStep: 49 },
@@ -4304,9 +4335,8 @@ function Quiz() {
           type="button"
           onClick={handleCompletionContinue}
           className={CONTINUE_BUTTON_ALWAYS_ENABLED}
-        >
-          Continue
-        </button>
+        >{t('quiz.common.continue')}
+      </button>
       </div>,
       {
         backStep: 41,
@@ -4394,9 +4424,8 @@ function Quiz() {
             onClick={handleTaiChiPlanEmailContinue}
             disabled={!valid}
             className={CONTINUE_BUTTON_CLASSES}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>,
       { backStep: 44 },
@@ -4469,9 +4498,8 @@ function Quiz() {
             onClick={handleQuizNameContinue}
             disabled={!nameOk}
             className={`${CONTINUE_BUTTON_CLASSES} w-full`}
-          >
-            Continue
-          </button>
+          >{t('quiz.common.continue')}
+        </button>
         </div>
       </div>,
       { backStep: 46, mainClassName: '!justify-center' },
@@ -4484,15 +4512,15 @@ function Quiz() {
     return renderQuizStepLayout(
       <div className="flex w-full max-w-md flex-col items-center justify-center text-center">
         <h2 className="mb-4 text-2xl font-bold text-gray-900">
-          Thank you{firstName ? `, ${firstName}` : ''}!
+          {firstName ? tLegacy('thankYouNamed', { firstName }) : tLegacy('thankYouPlain')}
         </h2>
-        <p className="mb-8 text-gray-600">You have completed the quiz.</p>
+        <p className="mb-8 text-gray-600">{tLegacy('quizComplete')}</p>
         <button
           type="button"
           onClick={() => setStep(52)}
           className={CONTINUE_BUTTON_ALWAYS_ENABLED + ' w-full max-w-sm'}
         >
-          Get My Plan
+          {tOffer('getMyPlan')}
         </button>
       </div>,
       { backStep: emailOptInAnswer === 'yes' ? 50 : 46 },

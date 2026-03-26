@@ -1,0 +1,16 @@
+{
+  "validation": {
+    "selectGoal": "Norėdami tęsti, pasirinkite bent vieną tikslą",
+    "selectBodyType": "Pasirinkite kūno tipą, kad galėtumėte tęsti",
+    "selectDreamBody": "Pasirinkite svajonių kūną, kad galėtumėte tęsti",
+    "selectArea": "Pasirinkite bent vieną sritį, kad galėtumėte tęsti",
+    "selectOption": "Pasirinkite variantą, kad galėtumėte tęsti",
+    "selectAtLeastOne": "Pasirinkite bent vieną variantą, kad galėtumėte tęsti"
+  },
+  "maleProgramNote": "Vyrų programa ruošiama – šis kelias pritaikytas moterims.",
+  "ageLink1839": "Man 18–39 >",
+  "exactAgeSr": "Jūsų amžius metais",
+  "thankYouPlain": "Ačiū!",
+  "thankYouNamed": "Ačiū, {{firstName}}!",
+  "quizComplete": "Apklausą užbaigėte."
+}

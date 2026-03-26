@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Check, Star, Question, Tag } from '@phosphor-icons/react';
 import WalkingIcon from './WalkingIcon';
 /** Before/After viename kadre – jūsų asset */
@@ -10,12 +12,15 @@ import testimonial88 from '../assets/img 88kg.webp';
 import testimonial147 from '../assets/img 147 kg.webp';
 import laurelLeftSvg from '../assets/sakele is kaires.svg';
 import securityInfoBanner from '../assets/security-info.png';
+import offerConfig from '../configs/offerConfig.json';
+import { swapLangInPath } from '../utils/localizedPath';
+import { withPreservedQueryParams } from '../utils/preserveQueryParams';
 
-/** Oranžinė – kaip reference (#ff6b3d) */
-const ORANGE = '#ff6b3d';
-const COUNTDOWN_TOTAL_SECONDS = 10 * 60; // 10 min atgal
-const TERMS_URL = 'https://info.walkingfl.fit/terms-of-use';
-const SUPPORT_EMAIL = 'support@walkingfl.fit';
+/** Iš offerConfig.json (Step 7 – be hardcode kainų / kontaktų) */
+const ORANGE = offerConfig.brand.primaryHex;
+const COUNTDOWN_TOTAL_SECONDS = offerConfig.countdownSeconds;
+const TERMS_URL = offerConfig.urls.terms;
+const SUPPORT_EMAIL = offerConfig.urls.supportEmail;
 
 function formatCountdown(totalSec) {
   const m = Math.floor(totalSec / 60);
@@ -26,8 +31,13 @@ function formatCountdown(totalSec) {
 /** 6 segmentų juosta (reference: Before 2 oranžiniai; After 6 oranžiniai) */
 const FITNESS_TOTAL = 6;
 function FitnessSegments({ filled }) {
+  const { t } = useTranslation('offer');
   return (
-    <div className="flex w-full gap-1" role="img" aria-label={`Fitness ${filled} of ${FITNESS_TOTAL}`}>
+    <div
+      className="flex w-full gap-1"
+      role="img"
+      aria-label={t('fitnessOf', { filled, total: FITNESS_TOTAL })}
+    >
       {Array.from({ length: FITNESS_TOTAL }, (_, i) => (
         <div
           key={i}
@@ -51,11 +61,12 @@ function StarRow({ count = 5, className = 'text-amber-400' }) {
 }
 
 const PRIMARY_BTN =
-  'w-full rounded-full px-6 py-3.5 text-center text-base font-bold text-white shadow-md transition active:scale-[0.99] hover:brightness-105';
+  'w-full max-w-[min(100%,22rem)] rounded-full px-5 py-3.5 text-center text-sm font-bold text-white shadow-md transition active:scale-[0.99] hover:brightness-105 sm:max-w-none sm:px-6 sm:text-base mx-auto sm:mx-0';
 const PRIMARY_BTN_STYLE = { backgroundColor: ORANGE };
 
 /** Promo kortelė kaip „bilietas“: viršus su žyma, perforacija, kodas + laikmatis */
 function PromoTicketCard({ promoCode, mm, ss, className = 'mb-6' }) {
+  const { t } = useTranslation('offer');
   return (
     <div
       className={`relative rounded-3xl border border-cyan-200/55 bg-[#e0f7fa] shadow-sm ${className}`}
@@ -68,7 +79,7 @@ function PromoTicketCard({ promoCode, mm, ss, className = 'mb-6' }) {
           <Tag className="h-5 w-5" weight="fill" />
         </span>
         <p className="text-center text-sm font-bold leading-snug text-gray-900 sm:text-base">
-          Your promo code applied!
+          {t('promoApplied')}
         </p>
       </div>
 
@@ -104,7 +115,7 @@ function PromoTicketCard({ promoCode, mm, ss, className = 'mb-6' }) {
                 {mm}
               </span>
               <span className="mt-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600">
-                minutes
+                {t('minutes')}
               </span>
             </div>
             <span className="select-none pt-1 text-xl font-light text-sky-600" aria-hidden>
@@ -115,7 +126,7 @@ function PromoTicketCard({ promoCode, mm, ss, className = 'mb-6' }) {
                 {ss}
               </span>
               <span className="mt-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600">
-                seconds
+                {t('seconds')}
               </span>
             </div>
           </div>
@@ -127,11 +138,12 @@ function PromoTicketCard({ promoCode, mm, ss, className = 'mb-6' }) {
 
 /** Trumpa žalia garantijos eilutė virš „Get My Plan“ (reference: uppercase) */
 function MoneyBackShortLine({ className = 'mb-4' }) {
+  const { t } = useTranslation('offer');
   return (
     <p
       className={`text-center text-[11px] font-extrabold uppercase tracking-[0.08em] text-emerald-600 sm:text-xs ${className}`}
     >
-      30-day money-back guarantee
+      {t('moneyBackShort')}
     </p>
   );
 }
@@ -141,16 +153,19 @@ function MoneyBackShortLine({ className = 'mb-4' }) {
  * radioGroupSuffix: skirtingas name, kad nebūtų dublikatų DOM (valdoma per React checked).
  */
 function PlanRadiosSection({ plans, planId, setPlanId, radioGroupSuffix = 'a', className = '' }) {
+  const { t } = useTranslation('offer');
   const groupName = `walking-plan-${radioGroupSuffix}`;
   return (
-    <section className={`mb-2 ${className}`} aria-label="Subscriptions">
-      <h2 className="sr-only">Choose your plan</h2>
+    <section className={`mb-2 ${className}`} aria-label={t('subscriptionsAria')}>
+      <h2 className="sr-only">{t('choosePlanSr')}</h2>
       <div className="space-y-4">
         {plans.map((p) => {
           const selected = planId === p.id;
           return (
             <div key={p.id} className="block">
-              <p className="mb-1.5 text-center text-xs font-medium text-gray-500">{p.subtitle}</p>
+              <p className="mb-1.5 text-center text-xs font-medium text-gray-500">
+                {p.subtitleKey ? t(p.subtitleKey) : ''}
+              </p>
               <label
                 className={`block cursor-pointer overflow-hidden rounded-2xl border-2 transition ${
                   selected
@@ -160,7 +175,7 @@ function PlanRadiosSection({ plans, planId, setPlanId, radioGroupSuffix = 'a', c
               >
                 {p.popular ? (
                   <div className="bg-gray-200 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-gray-800">
-                    Most popular
+                    {t(p.popularLabelKey || 'plans.popularBadge')}
                   </div>
                 ) : null}
                 <div className="flex gap-3 p-3 pt-3">
@@ -173,13 +188,15 @@ function PlanRadiosSection({ plans, planId, setPlanId, radioGroupSuffix = 'a', c
                     className="mt-1.5 h-4 w-4 shrink-0 accent-[#ff6b3d]"
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="text-base font-bold leading-tight text-gray-900">{p.title}</div>
+                    <div className="text-base font-bold leading-tight text-gray-900">
+                      {p.titleKey ? t(p.titleKey) : ''}
+                    </div>
                     <div
                       className={`mt-1 inline-block rounded-md px-2 py-0.5 text-sm font-bold ${
                         selected ? 'bg-[#ff6b3d] text-white' : 'bg-gray-200/90 text-gray-900'
                       }`}
                     >
-                      {p.off} OFF
+                      {t('offLabel', { percent: p.off })}
                     </div>
                     <div className="mt-2 flex flex-wrap items-baseline gap-2">
                       <span className="text-sm text-gray-400 line-through">{p.was}</span>
@@ -199,7 +216,7 @@ function PlanRadiosSection({ plans, planId, setPlanId, radioGroupSuffix = 'a', c
                         selected ? 'text-white/90' : 'text-gray-600'
                       }`}
                     >
-                      per day
+                      {t('perDay')}
                     </span>
                   </div>
                 </div>
@@ -216,10 +233,18 @@ function PlanRadiosSection({ plans, planId, setPlanId, radioGroupSuffix = 'a', c
  * Pasiūlymo / pirkimo tipo landingas (Plasmic purchase-3 analogas) – Tailwind + vietinės nuotraukos.
  */
 function PlanOfferLanding({
-  targetWeightKg = 85,
-  promoCode = 'Gintas mar2026',
+  targetWeightKg = offerConfig.defaultTargetWeightKg,
+  promoCode = offerConfig.defaultPromoCode,
+  plans: plansProp,
+  variantLabel,
+  discountDisplay,
   onGetPlan,
 }) {
+  const { t: tOffer } = useTranslation('offer');
+  const { t: tCommon, i18n } = useTranslation();
+  const location = useLocation();
+  const otherLang = i18n.language?.startsWith('lt') ? 'en' : 'lt';
+  const langSwitchHref = withPreservedQueryParams(swapLangInPath(location.pathname, otherLang));
   const [secondsLeft, setSecondsLeft] = useState(COUNTDOWN_TOTAL_SECONDS);
   const [planId, setPlanId] = useState('4w');
   const [appSlide, setAppSlide] = useState(0);
@@ -245,59 +270,43 @@ function PlanOfferLanding({
       : `${targetWeightKg} kg`;
 
   const appImages = [mobilePhoneHero, desiredWalkImg, walkingProfileImg];
-  const stories = [
-    {
-      img: testimonial147,
-      before: '93 kg',
-      after: '69 kg',
-      name: 'Sophia Peterson',
-      text: 'I used to hate workouts, now I walk every day and feel lighter, both in body and mind',
-    },
-    {
-      img: testimonial88,
-      before: '88 kg',
-      after: '80 kg',
-      name: 'Lily Morgan',
-      text: 'This app turned my walks into real progress. I’m seeing the difference on the scale and in my mood',
-    },
-  ];
+  const stories = useMemo(
+    () => [
+      {
+        img: testimonial147,
+        before: tOffer('storySophiaBefore'),
+        after: tOffer('storySophiaAfter'),
+        name: tOffer('storySophiaName'),
+        text: tOffer('storySophiaText'),
+      },
+      {
+        img: testimonial88,
+        before: tOffer('storyLilyBefore'),
+        after: tOffer('storyLilyAfter'),
+        name: tOffer('storyLilyName'),
+        text: tOffer('storyLilyText'),
+      },
+    ],
+    [tOffer],
+  );
 
   const handleGetPlan = useCallback(() => {
     onGetPlan?.();
   }, [onGetPlan]);
 
-  const plans = [
-    {
-      id: '1w',
-      title: '1-WEEK PLAN',
-      subtitle: 'Start your positive change',
-      off: '50%',
-      was: '$13.98',
-      now: '$6.99',
-      perDay: '.99',
-      popular: false,
-    },
-    {
-      id: '4w',
-      title: '4-WEEK PLAN',
-      subtitle: 'Get visible results',
-      off: '60%',
-      was: '$49.99',
-      now: '$19.99',
-      perDay: '.56',
-      popular: true,
-    },
-    {
-      id: '12w',
-      title: '12-WEEK PLAN',
-      subtitle: 'Become fit and toned',
-      off: '57%',
-      was: '$69.99',
-      now: '$29.99',
-      perDay: '.33',
-      popular: false,
-    },
-  ];
+  const defaultVariantId = offerConfig.defaultVariantId || 'base';
+  const fallbackPlans = offerConfig.variants?.[defaultVariantId]?.plans;
+  const plans =
+    plansProp ??
+    (Array.isArray(fallbackPlans) && fallbackPlans.length > 0 ? fallbackPlans : []);
+
+  if (!plans.length) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white px-4 text-center text-gray-600">
+        {tCommon('common.noPlans')}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen overflow-x-clip bg-white pb-[calc(4rem+env(safe-area-inset-bottom,0px))] font-sans text-gray-900">
@@ -319,7 +328,7 @@ function PlanOfferLanding({
                 {mm}
               </div>
               <div className="mt-1 text-[10px] font-medium uppercase tracking-wide text-gray-600">
-                minutes
+                {tOffer('minutes')}
               </div>
             </div>
             <span
@@ -337,7 +346,7 @@ function PlanOfferLanding({
                 {ss}
               </div>
               <div className="mt-1 text-[10px] font-medium uppercase tracking-wide text-gray-600">
-                seconds
+                {tOffer('seconds')}
               </div>
             </div>
           </div>
@@ -345,10 +354,10 @@ function PlanOfferLanding({
             <button
               type="button"
               onClick={handleGetPlan}
-              className="block rounded-full px-5 py-2.5 text-center text-sm font-bold text-white shadow-md transition hover:brightness-105 active:scale-[0.98] motion-safe:animate-pulse"
+              className="block max-w-full rounded-full px-3.5 py-2 text-center text-xs font-bold text-white shadow-md transition hover:brightness-105 active:scale-[0.98] motion-safe:animate-pulse sm:px-5 sm:py-2.5 sm:text-sm"
               style={PRIMARY_BTN_STYLE}
             >
-              Get My Plan
+              {tOffer('getMyPlan')}
             </button>
           </div>
         </div>
@@ -374,19 +383,19 @@ function PlanOfferLanding({
           >
             <div className="grid grid-cols-2 divide-x divide-gray-300/80">
               <div className="min-w-0 px-2 pr-3">
-                <p className="text-center text-xs font-bold text-gray-900">Body fat</p>
+                <p className="text-center text-xs font-bold text-gray-900">{tOffer('bodyFat')}</p>
                 <p className="mt-1 text-center text-base font-normal text-gray-900">&gt; 32%</p>
                 <div className="mx-auto my-3 h-px max-w-[88%] bg-gray-300/90" aria-hidden />
-                <p className="text-center text-xs font-bold text-gray-900">Fitness level</p>
+                <p className="text-center text-xs font-bold text-gray-900">{tOffer('fitnessLevel')}</p>
                 <div className="mt-2">
                   <FitnessSegments filled={2} />
                 </div>
               </div>
               <div className="min-w-0 px-3 pl-3">
-                <p className="text-center text-xs font-bold text-gray-900">Body fat</p>
+                <p className="text-center text-xs font-bold text-gray-900">{tOffer('bodyFat')}</p>
                 <p className="mt-1 text-center text-base font-normal text-gray-900">14–20%</p>
                 <div className="mx-auto my-3 h-px max-w-[88%] bg-gray-300/90" aria-hidden />
-                <p className="text-center text-xs font-bold text-gray-900">Fitness level</p>
+                <p className="text-center text-xs font-bold text-gray-900">{tOffer('fitnessLevel')}</p>
                 <div className="mt-2">
                   <FitnessSegments filled={6} />
                 </div>
@@ -395,18 +404,29 @@ function PlanOfferLanding({
           </div>
         </section>
 
-        <p className="mb-5 text-center text-xs italic text-gray-500">
-          *This is not a guarantee or promise of results.
-        </p>
+        <p className="mb-5 text-center text-xs italic text-gray-500">{tOffer('resultsDisclaimer')}</p>
 
         <div className="mb-6">
           <p className="mb-2 text-center text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-500">
-            Reach your target weight:
+            {tOffer('reachTargetPrefix')}
           </p>
           <h1 className="text-center text-[1.65rem] font-extrabold leading-snug tracking-tight text-gray-900 sm:text-[1.75rem]">
             <span style={{ color: ORANGE }}>{weightLabel}</span>{' '}
-            <span className="text-gray-900">with our action plan</span>
+            <span className="text-gray-900">{tOffer('withActionPlan')}</span>
           </h1>
+          {discountDisplay ? (
+            <p
+              className="mt-3 text-center text-sm font-bold tracking-tight"
+              style={{ color: ORANGE }}
+            >
+              {tOffer('saveUpToToday', { discount: discountDisplay })}
+            </p>
+          ) : null}
+          {variantLabel ? (
+            <p className="sr-only" aria-live="polite">
+              {tOffer('offerVariantSr', { name: variantLabel })}
+            </p>
+          ) : null}
         </div>
 
         <PromoTicketCard promoCode={promoCode} mm={mm} ss={ss} className="mb-6" />
@@ -425,16 +445,14 @@ function PlanOfferLanding({
           style={PRIMARY_BTN_STYLE}
           onClick={handleGetPlan}
         >
-          Get My Plan
+          {tOffer('getMyPlan')}
         </button>
         <p className="mb-10 text-center text-xs leading-relaxed text-gray-500">
-          You will be automatically charged $19.99 after the payment confirmation. The subscription
-          will then be auto-renewed every month after a 1-month intro offer at the full price of
-          $49.99. To learn more, visit our{' '}
+          {tOffer('legalSubscription')}{' '}
           <a href={TERMS_URL} className="font-semibold text-[#ff6b3d] underline" target="_blank" rel="noreferrer">
-            Terms of Use
+            {tOffer('termsOfUse')}
           </a>{' '}
-          or contact us at{' '}
+          {tOffer('orContactAt')}{' '}
           <a
             href={`mailto:${SUPPORT_EMAIL}`}
             className="font-semibold text-[#ff6b3d] underline"
@@ -446,7 +464,7 @@ function PlanOfferLanding({
         </p>
 
         {/* Mobilios app nuotraukos */}
-        <h2 className="mb-3 text-xl font-bold">Use Our Handy Mobile App to Improve Your Results</h2>
+        <h2 className="mb-3 text-xl font-bold">{tOffer('mobileAppHeading')}</h2>
         <div className="relative mb-2 w-full overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200/60">
           <div
             className="flex transition-transform duration-300 ease-out"
@@ -479,11 +497,11 @@ function PlanOfferLanding({
               type="button"
               onClick={() => setAppSlide(i)}
               className={`h-2 w-2 rounded-full transition ${i === appSlide ? 'bg-[#ff6b3d]' : 'bg-gray-300'}`}
-              aria-label={`Slide ${i + 1}`}
+              aria-label={tOffer('slideAria', { n: i + 1 })}
             />
           ))}
         </div>
-        <p className="mb-8 text-center text-xs text-gray-500">*after finishing you can start a new one</p>
+        <p className="mb-8 text-center text-xs text-gray-500">{tOffer('afterFinishNote')}</p>
 
         <div className="mb-10 flex items-center justify-center gap-2 py-4 sm:gap-3">
           <img
@@ -496,11 +514,11 @@ function PlanOfferLanding({
           />
           <p className="flex min-w-0 flex-col items-center justify-center text-center">
             <span className="flex items-baseline justify-center gap-0.5 leading-[0.95] text-gray-900">
-              <span className="text-2xl font-bold sm:text-3xl">#</span>
+              <span className="text-2xl font-bold sm:text-3xl">{tOffer('numberOneHash')}</span>
               <span className="text-4xl font-extrabold tracking-tight sm:text-5xl">1</span>
             </span>
             <span className="mt-1 text-sm font-bold leading-tight text-gray-900 sm:text-base">
-              Walking App
+              {tOffer('numberOneWalkingApp')}
             </span>
           </p>
           <img
@@ -514,9 +532,9 @@ function PlanOfferLanding({
         </div>
 
         <h2 className="mb-3 text-center text-2xl font-extrabold leading-tight">
-          Start Losing Weight
+          {tOffer('startLosingWeight')}
           <br />
-          Right Now
+          {tOffer('rightNow')}
         </h2>
         <button
           type="button"
@@ -524,37 +542,34 @@ function PlanOfferLanding({
           style={PRIMARY_BTN_STYLE}
           onClick={handleGetPlan}
         >
-          Get My Plan
+          {tOffer('getMyPlan')}
         </button>
 
         <section className="mb-10 rounded-[2rem] bg-[#fff3e8] px-6 py-8 text-center sm:rounded-[2.5rem] sm:px-10 sm:py-10">
-          <h2 className="mb-4 text-xl font-bold text-gray-900 sm:text-2xl">Why it works</h2>
+          <h2 className="mb-4 text-xl font-bold text-gray-900 sm:text-2xl">{tOffer('whyItWorksTitle')}</h2>
           <p className="mx-auto max-w-md text-sm leading-relaxed text-gray-700 sm:text-base">
-            According to your goals and personal data, our algorithm will craft a personalized
-            walking plan to yield the best results. The app will set achievable daily activity goals
-            and suggest a tailored walking workout program that will smoothly guide you to the
-            target activity level for the first 4 weeks.
+            {tOffer('whyItWorksBody')}
           </p>
         </section>
 
         <section className="mb-10 text-center">
-          <h2 className="mb-4 text-xl font-bold">What you get</h2>
+          <h2 className="mb-4 text-xl font-bold">{tOffer('whatYouGetTitle')}</h2>
           <ul className="mx-auto max-w-md space-y-4 text-left text-sm text-gray-700">
             {[
-              '300+ workouts & 500+ exercises from certified coaches with detailed video tutorials',
-              '10-minute routines to fit into the busiest schedule',
-              'Anywhere, anytime, no-equipment-needed training',
-              'A variety of walking plans to try a new one every day',
-              'Fun. Drive. Health. To enjoy every minute of it!',
-            ].map((line) => (
-              <li key={line} className="flex gap-3">
+              'whatYouGetItem1',
+              'whatYouGetItem2',
+              'whatYouGetItem3',
+              'whatYouGetItem4',
+              'whatYouGetItem5',
+            ].map((lineKey) => (
+              <li key={lineKey} className="flex gap-3">
                 <span
                   className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white"
                   style={{ backgroundColor: ORANGE }}
                 >
                   <Check className="h-3.5 w-3.5" weight="bold" />
                 </span>
-                <span>{line}</span>
+                <span>{tOffer(lineKey)}</span>
               </li>
             ))}
           </ul>
@@ -564,16 +579,14 @@ function PlanOfferLanding({
             style={PRIMARY_BTN_STYLE}
             onClick={handleGetPlan}
           >
-            Get My Plan
+            {tOffer('getMyPlan')}
           </button>
         </section>
 
         {/* Success stories */}
         <section className="mb-10">
-          <h2 className="mb-2 text-xl font-bold">Walking success stories!</h2>
-          <p className="mb-4 text-sm text-gray-600">
-            They’ve done it, so why can’t you? Here’s a few of our clients’ success stories.
-          </p>
+          <h2 className="mb-2 text-xl font-bold">{tOffer('storiesTitle')}</h2>
+          <p className="mb-4 text-sm text-gray-600">{tOffer('storiesIntro')}</p>
           <div className="overflow-hidden rounded-2xl bg-gray-50">
             <img
               src={stories[storySlide].img}
@@ -599,7 +612,7 @@ function PlanOfferLanding({
                 type="button"
                 onClick={() => setStorySlide(i)}
                 className={`h-2 w-2 rounded-full ${i === storySlide ? 'bg-[#ff6b3d]' : 'bg-gray-300'}`}
-                aria-label={`Story ${i + 1}`}
+                aria-label={tOffer('storyAria', { n: i + 1 })}
               />
             ))}
           </div>
@@ -609,63 +622,45 @@ function PlanOfferLanding({
         <section className="mb-10">
           <h2 className="mb-4 flex items-center gap-2 text-xl font-bold">
             <Question className="h-6 w-6 text-[#F16E43]" weight="fill" />
-            What people often ask
+            {tOffer('faqSectionTitle')}
           </h2>
           <div className="space-y-6 text-sm">
             <div>
-              <h3 className="mb-2 font-bold">What is Walking?</h3>
-              <p className="leading-relaxed text-gray-600">
-                Walking is an app that offers you walking as a routine to keep you fit and lose weight
-                if needed. A variety of plans adapted into 5–30 minutes walking workouts will get you
-                into the true groove of your body.
-              </p>
+              <h3 className="mb-2 font-bold">{tOffer('faqWhatIsWalkingQ')}</h3>
+              <p className="leading-relaxed text-gray-600">{tOffer('faqWhatIsWalkingA')}</p>
             </div>
             <div>
-              <h3 className="mb-2 font-bold">What is a personal program?</h3>
-              <p className="leading-relaxed text-gray-600">
-                It&apos;s a plan tailored for you based on your goals and preferences. You can choose
-                from 5–30 min workouts to fit into your calendar, as well as your level — from
-                beginner to pro.
-              </p>
+              <h3 className="mb-2 font-bold">{tOffer('faqPersonalProgramQ')}</h3>
+              <p className="leading-relaxed text-gray-600">{tOffer('faqPersonalProgramA')}</p>
             </div>
             <div>
-              <h3 className="mb-2 font-bold">When will I see the results?</h3>
-              <p className="leading-relaxed text-gray-600">
-                Although it depends on many factors, you may start to see visible results within the
-                first 28 days!
-              </p>
+              <h3 className="mb-2 font-bold">{tOffer('faqResultsQ')}</h3>
+              <p className="leading-relaxed text-gray-600">{tOffer('faqResultsA')}</p>
             </div>
           </div>
         </section>
 
         {/* Reviews */}
         <section className="mb-10">
-          <h2 className="mb-4 text-xl font-bold">Reviews</h2>
+          <h2 className="mb-4 text-xl font-bold">{tOffer('reviewsTitle')}</h2>
           <div className="space-y-6">
-            {[
-              {
-                name: 'George Hoffman',
-                text: 'This is the best home workout plan! I can really feel the positive impact on my body, and it helps me release stress.',
-              },
-              {
-                name: 'Cindy Paige',
-                text: 'Easy and fun. Nice app for me as beginner. This is my new favorite routine!',
-              },
-              {
-                name: 'Aida Mazza',
-                text: 'I truly feel like they have a great impact on my physical body and it releases the stress.',
-              },
-            ].map((r) => (
-              <div key={r.name} className="rounded-2xl border border-gray-100 bg-gray-50/80 p-4">
-                <div className="mb-1 font-semibold">{r.name}</div>
+            {(
+              [
+                { nameKey: 'reviewGeorgeName', textKey: 'reviewGeorgeText' },
+                { nameKey: 'reviewCindyName', textKey: 'reviewCindyText' },
+                { nameKey: 'reviewAidaName', textKey: 'reviewAidaText' },
+              ] 
+            ).map((r) => (
+              <div key={r.nameKey} className="rounded-2xl border border-gray-100 bg-gray-50/80 p-4">
+                <div className="mb-1 font-semibold">{tOffer(r.nameKey)}</div>
                 <StarRow />
-                <p className="mt-2 text-sm text-gray-600">{r.text}</p>
+                <p className="mt-2 text-sm text-gray-600">{tOffer(r.textKey)}</p>
               </div>
             ))}
           </div>
         </section>
 
-        <h2 className="mb-6 text-center text-xl font-extrabold">Get visible results in 4 weeks!</h2>
+        <h2 className="mb-6 text-center text-xl font-extrabold">{tOffer('visibleResultsHeading')}</h2>
 
         <PromoTicketCard promoCode={promoCode} mm={mm} ss={ss} className="mb-4" />
 
@@ -684,14 +679,14 @@ function PlanOfferLanding({
           style={PRIMARY_BTN_STYLE}
           onClick={handleGetPlan}
         >
-          Get My Plan
+          {tOffer('getMyPlan')}
         </button>
 
         {/* Po antro CTA: SSL + „Powered by Stripe“ (1:1 su security-info.png) */}
         <div className="mb-8 flex justify-center px-1">
           <img
             src={securityInfoBanner}
-            alt="Secure SSL encryption. Powered by Stripe."
+            alt={tOffer('securityBannerAlt')}
             className="mx-auto block h-auto w-full max-w-[280px] object-contain"
             loading="lazy"
             decoding="async"
@@ -699,13 +694,11 @@ function PlanOfferLanding({
         </div>
 
         <section className="mb-10 rounded-2xl bg-emerald-50/60 p-5 ring-1 ring-emerald-100">
-          <h2 className="mb-2 text-lg font-bold">100% Money-Back Guarantee</h2>
+          <h2 className="mb-2 text-lg font-bold">{tOffer('moneyBackTitle')}</h2>
           <p className="text-sm leading-relaxed text-gray-600">
-            We are confident in the quality of our plan. We are even ready to return your money if you
-            don’t see visible results and can demonstrate that you followed your plan. For more
-            information, please read our{' '}
+            {tOffer('moneyBackBody')}{' '}
             <a href={TERMS_URL} className="font-semibold text-[#ff6b3d] underline" target="_blank" rel="noreferrer">
-              Terms of Use
+              {tOffer('termsOfUse')}
             </a>
             .
           </p>
@@ -713,26 +706,29 @@ function PlanOfferLanding({
 
         <section className="space-y-6 border-t border-gray-100 pt-8 text-sm text-gray-600">
           <div>
-            <h2 className="mb-2 text-lg font-bold text-gray-900">Your information is safe</h2>
-            <p>
-              We won’t sell or rent your personal contact information for any marketing purposes
-              whatsoever.
-            </p>
+            <h2 className="mb-2 text-lg font-bold text-gray-900">{tOffer('infoSafeTitle')}</h2>
+            <p>{tOffer('infoSafeBody')}</p>
           </div>
           <div>
-            <h2 className="mb-2 text-lg font-bold text-gray-900">Secure checkout</h2>
-            <p>All information is encrypted and transmitted without risk using SSL.</p>
+            <h2 className="mb-2 text-lg font-bold text-gray-900">{tOffer('secureCheckoutTitle')}</h2>
+            <p>{tOffer('secureCheckoutBody')}</p>
           </div>
           <div>
-            <h2 className="mb-2 text-lg font-bold text-gray-900">Need help?</h2>
+            <h2 className="mb-2 text-lg font-bold text-gray-900">{tOffer('needHelpTitle')}</h2>
             <p>
-              Send us an email:{' '}
+              {tOffer('needHelpBody')}{' '}
               <a href={`mailto:${SUPPORT_EMAIL}`} className="font-semibold text-[#ff6b3d] underline">
                 {SUPPORT_EMAIL}
               </a>
             </p>
           </div>
         </section>
+
+        <p className="pb-10 pt-4 text-center text-sm text-gray-500">
+          <Link to={langSwitchHref} className="font-medium text-[#ff6b3d] underline underline-offset-2">
+            {otherLang === 'lt' ? tCommon('common.switchToLt') : tCommon('common.switchToEn')}
+          </Link>
+        </p>
       </main>
     </div>
   );

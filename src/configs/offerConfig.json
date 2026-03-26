@@ -1,0 +1,141 @@
+{
+  "brand": {
+    "primaryHex": "#ff6b3d"
+  },
+  "urls": {
+    "terms": "https://info.walkingfl.fit/terms-of-use",
+    "supportEmail": "support@walkingfl.fit"
+  },
+  "countdownSeconds": 600,
+  "defaultPromoCode": "Gintas mar2026",
+  "defaultTargetWeightKg": 85,
+  "defaultVariantId": "base",
+  "variants": {
+    "base": {
+      "id": "base",
+      "name": "Base",
+      "pathSegment": "offer",
+      "discountPercent": 61,
+      "displayOff": "61%",
+      "plans": [
+        {
+          "id": "1w",
+          "titleKey": "plans.1w.title",
+          "subtitleKey": "plans.1w.subtitle",
+          "popularLabelKey": "plans.popularBadge",
+          "off": "61%",
+          "was": "$13.98",
+          "now": "$6.99",
+          "perDay": ".99",
+          "popular": false
+        },
+        {
+          "id": "4w",
+          "titleKey": "plans.4w.title",
+          "subtitleKey": "plans.4w.subtitle",
+          "popularLabelKey": "plans.popularBadge",
+          "off": "61%",
+          "was": "$49.99",
+          "now": "$19.99",
+          "perDay": ".56",
+          "popular": true
+        },
+        {
+          "id": "12w",
+          "titleKey": "plans.12w.title",
+          "subtitleKey": "plans.12w.subtitle",
+          "popularLabelKey": "plans.popularBadge",
+          "off": "61%",
+          "was": "$69.99",
+          "now": "$29.99",
+          "perDay": ".33",
+          "popular": false
+        }
+      ]
+    },
+    "second": {
+      "id": "second",
+      "name": "Second",
+      "pathSegment": "offer-68",
+      "discountPercent": 68,
+      "displayOff": "68%",
+      "plans": [
+        {
+          "id": "1w",
+          "titleKey": "plans.1w.title",
+          "subtitleKey": "plans.1w.subtitle",
+          "popularLabelKey": "plans.popularBadge",
+          "off": "68%",
+          "was": "$13.98",
+          "now": "$6.99",
+          "perDay": ".99",
+          "popular": false
+        },
+        {
+          "id": "4w",
+          "titleKey": "plans.4w.title",
+          "subtitleKey": "plans.4w.subtitle",
+          "popularLabelKey": "plans.popularBadge",
+          "off": "68%",
+          "was": "$49.99",
+          "now": "$19.99",
+          "perDay": ".56",
+          "popular": true
+        },
+        {
+          "id": "12w",
+          "titleKey": "plans.12w.title",
+          "subtitleKey": "plans.12w.subtitle",
+          "popularLabelKey": "plans.popularBadge",
+          "off": "68%",
+          "was": "$69.99",
+          "now": "$29.99",
+          "perDay": ".33",
+          "popular": false
+        }
+      ]
+    },
+    "third": {
+      "id": "third",
+      "name": "Third",
+      "pathSegment": "offer-75",
+      "discountPercent": 75,
+      "displayOff": "75%",
+      "plans": [
+        {
+          "id": "1w",
+          "titleKey": "plans.1w.title",
+          "subtitleKey": "plans.1w.subtitle",
+          "popularLabelKey": "plans.popularBadge",
+          "off": "75%",
+          "was": "$13.98",
+          "now": "$6.99",
+          "perDay": ".99",
+          "popular": false
+        },
+        {
+          "id": "4w",
+          "titleKey": "plans.4w.title",
+          "subtitleKey": "plans.4w.subtitle",
+          "popularLabelKey": "plans.popularBadge",
+          "off": "75%",
+          "was": "$49.99",
+          "now": "$19.99",
+          "perDay": ".56",
+          "popular": true
+        },
+        {
+          "id": "12w",
+          "titleKey": "plans.12w.title",
+          "subtitleKey": "plans.12w.subtitle",
+          "popularLabelKey": "plans.popularBadge",
+          "off": "75%",
+          "was": "$69.99",
+          "now": "$29.99",
+          "perDay": ".33",
+          "popular": false
+        }
+      ]
+    }
+  }
+}

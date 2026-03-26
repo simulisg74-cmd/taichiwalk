@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "meta": {
+    "totalProgressSegments": 49,
+    "legacyHandoffStep": 6,
+    "locale": "en"
+  },
+  "features": {
+    "maleBranchEnabled": true
+  },
+  "steps": [
+    {
+      "id": "splash",
+      "type": "splash",
+      "progressNumerator": 1,
+      "durationMs": 10000,
+      "progressIntervalMs": 100,
+      "i18n": {
+        "titleKey": "quiz.splash.titleLine1",
+        "titleLine2Key": "quiz.splash.titleLine2",
+        "titleLine3Key": "quiz.splash.titleLine3",
+        "loadingLabelKey": "quiz.splash.loadingLabel"
+      }
+    },
+    {
+      "id": "gender",
+      "type": "gender_select",
+      "progressNumerator": 2,
+      "answerKey": "gender",
+      "i18n": {
+        "titleKey": "quiz.gender.title",
+        "titleAccentKey": "quiz.gender.titleAccent",
+        "subtitleKey": "quiz.gender.subtitle",
+        "femaleKey": "quiz.gender.female",
+        "maleKey": "quiz.gender.male"
+      }
+    },
+    {
+      "id": "trust_social",
+      "type": "trust_hero",
+      "progressNumerator": 3,
+      "i18n": {
+        "headlineFemaleKey": "quiz.trust.headlineFemale",
+        "headlineMaleKey": "quiz.trust.headlineMale",
+        "sublineKey": "quiz.trust.sublineRich",
+        "continueKey": "quiz.common.continue"
+      },
+      "assets": {
+        "heroFemaleKey": "threeWomen",
+        "heroMaleKey": "threeMen",
+        "laurelKey": "laurelLeft"
+      }
+    },
+    {
+      "id": "age",
+      "type": "age_grid",
+      "progressNumerator": 4,
+      "answerKey": "ageRange",
+      "i18n": {
+        "headingKey": "quiz.age.heading",
+        "subheadingKey": "quiz.age.subheading"
+      },
+      "options": [
+        { "value": "40-49", "labelKey": "quiz.age.option4049" },
+        { "value": "50-59", "labelKey": "quiz.age.option5059" },
+        { "value": "60-69", "labelKey": "quiz.age.option6069" },
+        { "value": "70-80", "labelKey": "quiz.age.option7080" }
+      ],
+      "assets": {
+        "femaleImages": {
+          "40-49": "femaleAge4049",
+          "50-59": "femaleAge5059",
+          "60-69": "femaleAge6069",
+          "70-80": "femaleAge7080"
+        },
+        "maleImages": {
+          "40-49": "maleAge4049",
+          "50-59": "maleAge5059",
+          "60-69": "maleAge6069",
+          "70-80": "maleAge7080"
+        }
+      }
+    },
+    {
+      "id": "goals",
+      "type": "goals_multi",
+      "progressNumerator": 5,
+      "answerKey": "goals",
+      "i18n": {
+        "titleKey": "quiz.goals.title",
+        "hintKey": "quiz.goals.hint",
+        "validationKey": "quiz.goals.validation",
+        "continueKey": "quiz.common.continue"
+      },
+      "options": [
+        { "value": "lose_weight", "labelKey": "quiz.goals.lose_weight" },
+        { "value": "heart_health", "labelKey": "quiz.goals.heart_health" },
+        { "value": "flexibility", "labelKey": "quiz.goals.flexibility" },
+        { "value": "self_esteem", "labelKey": "quiz.goals.self_esteem" },
+        { "value": "stay_fit", "labelKey": "quiz.goals.stay_fit" },
+        { "value": "reduce_stress", "labelKey": "quiz.goals.reduce_stress" },
+        { "value": "firm_toned", "labelKey": "quiz.goals.firm_toned" }
+      ]
+    },
+    {
+      "id": "legacy_handoff",
+      "type": "legacy_handoff",
+      "progressNumerator": 5
+    }
+  ]
+}

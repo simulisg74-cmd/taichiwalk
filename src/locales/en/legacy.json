@@ -1,0 +1,16 @@
+{
+  "validation": {
+    "selectGoal": "Please select at least one goal to continue",
+    "selectBodyType": "Please select your body type to continue",
+    "selectDreamBody": "Please select your dream body to continue",
+    "selectArea": "Please select at least one area to continue",
+    "selectOption": "Please select an option to continue",
+    "selectAtLeastOne": "Please select at least one option to continue"
+  },
+  "maleProgramNote": "Men's program — we're polishing it next; this flow is tailored for women.",
+  "ageLink1839": "I'm 18-39 >",
+  "exactAgeSr": "Your age in years",
+  "thankYouPlain": "Thank you!",
+  "thankYouNamed": "Thank you, {{firstName}}!",
+  "quizComplete": "You have completed the quiz."
+}

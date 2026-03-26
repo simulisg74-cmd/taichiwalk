@@ -1,0 +1,71 @@
+{
+  "quiz": {
+    "common": {
+      "continue": "Continue"
+    },
+    "splash": {
+      "leadIn": "Take the first step in",
+      "titleLine1": "Tai Chi:",
+      "titleLine2": "Transform",
+      "titleLine3": "Your WALK!",
+      "loadingLabel": "Loading the quiz"
+    },
+    "gender": {
+      "title": "What is your ",
+      "titleAccent": "gender?",
+      "subtitle": "This information will help us create a suitable program for you",
+      "female": "Female",
+      "male": "Male"
+    },
+    "trust": {
+      "headlineFemale": "10 million women",
+      "headlineMale": "10 million men",
+      "subline": "trust Walking with their fitness goals",
+      "sublineRich": "trust <w>Walking</w> with their fitness goals",
+      "heroAltFemale": "Women in the Walking program",
+      "heroAltMale": "Men in the Walking program"
+    },
+    "age": {
+      "heading": "Personalized Tai Chi Walking Plan",
+      "basedOnAge": "Based on your age",
+      "subheading": "Choose your age group",
+      "option4049": "Age: 40-49",
+      "option5059": "Age: 50-59",
+      "option6069": "Age: 60-69",
+      "option7080": "Age: 70-80"
+    },
+    "goals": {
+      "title": "What do you want to achieve?",
+      "hint": "Select as many goals as you want",
+      "validation": "Please select at least one goal to continue",
+      "lose_weight": "Lose weight",
+      "heart_health": "Improve heart health",
+      "flexibility": "Develop flexibility",
+      "self_esteem": "Improve self-esteem and love my body",
+      "stay_fit": "Stay fit",
+      "reduce_stress": "Reduce stress",
+      "firm_toned": "Get firm and toned"
+    },
+    "exactAge": {
+      "title": "How old are you?",
+      "subtitle": "We'll tailor your experience accordingly"
+    }
+  },
+  "common": {
+    "back": "Back",
+    "menu": "Menu",
+    "closeMenu": "Close menu",
+    "termsOfUse": "Terms of Use",
+    "privacyPolicy": "Privacy Policy",
+    "emailUs": "Email us",
+    "menuSr": "Menu",
+    "redirecting": "Redirecting…",
+    "offerMissing": "Offer configuration missing for this path.",
+    "noPlans": "No plan options configured.",
+    "switchToEn": "English",
+    "switchToLt": "Lietuvių"
+  },
+  "brand": {
+    "walking": "Walking"
+  }
+}

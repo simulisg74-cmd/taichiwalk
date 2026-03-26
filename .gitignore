@@ -25,14 +25,6 @@ dist-ssr
 .DS_Store
 Thumbs.db
 
-# Naršyklėje išsaugoti puslapiai (nenaudojami importuose)
-src/assets/deagrama high intensity.html
-src/assets/deagrama high intensity_files/
-src/assets/mergina rankom istiestom.html
-src/assets/mergina rankom istiestom_files/
-src/assets/mrgina su kilimeliu.html
-src/assets/mrgina su kilimeliu_files/
-
 # Logs
 *.log
 npm-debug.log*
