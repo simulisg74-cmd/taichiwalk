@@ -1,0 +1,18 @@
+---
+description: Visi automatizuoti / AI rezultatai – tik po rankinio patikrinimo
+alwaysApply: true
+---
+
+# Rankinis rezultatų tikrinimas
+
+**Visi išėjimai turi būti patvirtinti rankiniu būdu** prieš merge, deploy ar release.
+
+Tai apima:
+
+- AI ar kitų įrankių generuotą ar siūlomą kodą
+- Build / bundler išvestį ir priklausomybes
+- Tekstus, vertimus ir marketingo copy
+- Paveikslėlius, assetus ir konfigūracijas
+- CI artefaktus ir automatinius commitus
+
+Automatiniai ar pusiau automatiniai žingsniai (pvz. `npm run build`, formatavimas) **nepakeičia** šio reikalavimo: galutinis sprendimas ir atsakomybė lieka žmogui, kuris peržiūri pakeitimus.
