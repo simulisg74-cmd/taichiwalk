@@ -1,10 +1,10 @@
 {
   "quizShell": {
-    "screen": "min-h-screen bg-white",
-    "header": "grid grid-cols-3 items-center border-b border-gray-100 px-4 py-4 bg-white",
-    "progressTrack": "h-0.5 w-full bg-gray-100",
+    "screen": "flex h-[100dvh] min-h-0 w-full flex-col overflow-hidden bg-white",
+    "header": "grid shrink-0 grid-cols-3 items-center border-b border-gray-100 bg-white px-4 py-4",
+    "progressTrack": "h-0.5 w-full shrink-0 bg-gray-100",
     "progressFill": "h-full bg-[#e07a4f] transition-all duration-300 ease-out",
-    "main": "relative z-0 flex min-h-[calc(100vh-100px)] flex-col items-center justify-start overflow-visible px-4 pb-[calc(3rem+env(safe-area-inset-bottom,0px))] pt-8 sm:px-6 sm:pt-10 md:pt-14"
+    "main": "relative z-0 flex min-h-0 w-full flex-1 flex-col items-center justify-start overflow-y-auto overflow-x-visible px-4 pb-4 pt-8 sm:px-6 sm:pt-10 md:pt-14"
   },
   "buttons": {
     "continue": "inline-flex w-full max-w-[min(100%,20rem)] items-center justify-center rounded-full px-6 py-3.5 text-base font-semibold text-white transition-all active:scale-[0.98] sm:w-auto sm:max-w-none sm:px-10 md:px-12 bg-orange-500 hover:bg-orange-600",
@@ -26,9 +26,9 @@
     "progressFill": "absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-orange-600 via-orange-500 to-amber-400 transition-[width] duration-150 ease-linear"
   },
   "trustHero": {
-    "screen": "min-h-screen overflow-x-clip bg-[#f3e9dc]",
-    "header": "grid grid-cols-3 items-center border-b border-amber-200/50 bg-white/80 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top,0px))] backdrop-blur-sm",
-    "progressTrack": "h-1 w-full bg-amber-200/50",
+    "screen": "flex h-[100dvh] min-h-0 w-full flex-col overflow-hidden overflow-x-clip bg-[#f3e9dc]",
+    "header": "grid shrink-0 grid-cols-3 items-center border-b border-amber-200/50 bg-white/80 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top,0px))] backdrop-blur-sm",
+    "progressTrack": "h-1 w-full shrink-0 bg-amber-200/50",
     "progressFill": "h-full bg-orange-500 transition-all duration-300 ease-out"
   }
 }

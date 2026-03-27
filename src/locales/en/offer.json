@@ -3,6 +3,8 @@
   "promoApplied": "Your promo code applied!",
   "minutes": "minutes",
   "seconds": "seconds",
+  "minutesAbbr": "min",
+  "secondsAbbr": "sec",
   "getMyPlan": "Get My Plan",
   "moneyBackShort": "30-day money-back guarantee",
   "subscriptionsAria": "Subscriptions",

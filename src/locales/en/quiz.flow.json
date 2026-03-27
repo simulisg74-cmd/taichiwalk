@@ -1,0 +1,367 @@
+{
+  "common": {
+    "gotIt": "Got it",
+    "gotItExclaim": "Got it!",
+    "great": "Great!",
+    "letsDoIt": "Let's Do It!",
+    "chooseAllApply": "Choose all that apply",
+    "kg": "KG",
+    "email": "Email",
+    "skipQuestion": "Skip this question",
+    "yourEmailFallback": "your email"
+  },
+  "bodyType": {
+    "title": "What image describes your physical build?",
+    "slim": "Slim",
+    "mid_sized": "Mid-sized",
+    "plus_sized": "Plus-sized",
+    "overweight": "Overweight"
+  },
+  "dreamBody": {
+    "title": "What is your dream body?",
+    "thin": "Thin",
+    "toned": "Toned",
+    "healthy": "Healthy",
+    "curvyFemale": "Curvy",
+    "curvyMale": "Shapely"
+  },
+  "focus": {
+    "title": "Which areas do you want to focus on?",
+    "subtitle": "Your walking plan will be focused on these areas",
+    "legs": "Legs",
+    "belly": "Belly",
+    "arms": "Arms",
+    "chest": "Chest",
+    "buttocks": "Buttocks",
+    "hips": "Hips",
+    "full_body": "Full body"
+  },
+  "cellulite": {
+    "title": "Do you struggle with cellulite?",
+    "yes": "Yes",
+    "no": "No",
+    "a_little": "A little bit"
+  },
+  "bestShape": {
+    "title": "How long ago were you in the best shape of your life?",
+    "less_than_year": "Less than a year ago",
+    "1_to_2_years": "1 to 2 years ago",
+    "more_than_3": "More than 3 years ago",
+    "never": "Never"
+  },
+  "weightFluct": {
+    "title": "How would you describe your weight fluctuations?",
+    "gain_fast_lose_slow": "I gain weight fast but lose it slowly",
+    "gain_lose_easily": "I gain and lose weight easily",
+    "struggle_to_gain": "I struggle to gain weight or muscle"
+  },
+  "harvard": {
+    "gazetteAlt": "The Harvard Gazette",
+    "maleTitleBefore": "Weight Loss and Health",
+    "maleBenefits": "Benefits",
+    "maleTitleMid": "of Tai Chi Walking",
+    "maleAge": "for Men over 50",
+    "femaleHelp": "Weight Loss and Health",
+    "femaleBenefits": "Benefits",
+    "femaleTitleMid": "of Tai Chi Walking",
+    "femaleAge": "for Women over 50",
+    "quotePart1": "A study in the Journal of Aging and Physical Activity found that Tai Chi walking led to a",
+    "quoteBold1": "20%",
+    "quotePart2": "boost in heart health and helped",
+    "quoteBold2": "lose 6-8% of body weight",
+    "quotePart3": "within 4-12 weeks."
+  },
+  "stairs": {
+    "title": "How do you feel after climbing some stairs?",
+    "subtitle": "This will help test your cardiorespiratory function.",
+    "out_of_breath": "Out of breath",
+    "sometimes_tired": "Sometimes tired but this OK",
+    "easily": "Easily"
+  },
+  "taiChiPromo": {
+    "title": "Nurture your health with safe and low-impact Tai Chi workouts!",
+    "body": "Our Tai Chi workouts focus on body awareness and gentle movements. They are a safer alternative to high-impact workouts for those prone to injuries or joint discomfort."
+  },
+  "energyBalance": {
+    "title": "Not a problem! We'll balance your energy levels",
+    "subtitle": "Weekly energy level with walking",
+    "diagramAlt": "Energy diagram: intensity curve with high intensity at the peak",
+    "body1": "Our fun and engaging workouts enhance overall body mobility, gently activate your muscles, and charge you for the day!",
+    "body2": "Pump up your energy, stamina, and mood to enjoy every moment of your life!"
+  },
+  "sleep": {
+    "title": "How much sleep do you usually get?",
+    "maleAlt": "Man stretching in bed after waking up",
+    "femaleAlt": "Woman stretching in bed after waking up",
+    "less_than_5": "Less than 5 hours",
+    "5_to_6": "5-6 hours",
+    "7_to_8": "7-8 hours",
+    "more_than_8": "More than 8 hours"
+  },
+  "walkFreq": {
+    "title": "How often do you go for walks?",
+    "almost_daily": "Almost every day",
+    "3_4_week": "3-4 times per week",
+    "1_2_week": "1-2 times per week",
+    "once_month": "Once a month or less"
+  },
+  "taiChiInfo": {
+    "title": "Tai Chi Walking: just as effective as high-impact workouts",
+    "p1a": "People often think walking is less effective than high-impact workouts like running.",
+    "p1b": "But studies show",
+    "p1c": "Tai Chi walking",
+    "p1d": "especially at a brisk pace",
+    "p1e": "can be a powerful way to boost your fitness",
+    "p1f": "and support your overall well-being.",
+    "source": "Source: 'Walking for Exercise' Harvard Nutrition Source",
+    "maleImgAlt": "Smiling man with arms raised, fitness and well-being",
+    "femaleImgAlt": "Smiling woman with yoga mat and water bottle"
+  },
+  "workSchedule": {
+    "title": "What's your work schedule like?",
+    "9_to_5": "9 to 5 job",
+    "flexible": "My hours are flexible",
+    "night_shifts": "Night shifts",
+    "dont_work": "I don't work",
+    "stay_at_home": "Stay-at-home parent"
+  },
+  "lifestyle": {
+    "title": "How active is your lifestyle?",
+    "subtitle": "We will take it into consideration when creating your program",
+    "sedentary": "Sedentary",
+    "sedentarySub": "I don't exercise or move much",
+    "somewhat_active": "Somewhat active",
+    "somewhat_activeSub": "I don't exercise, but I move a lot",
+    "active": "Active",
+    "activeSub": "I exercise a few times per week",
+    "very_active": "Very active",
+    "very_activeSub": "I exercise almost every day"
+  },
+  "activities": {
+    "title": "Are any of these activities part of your life?",
+    "walking_pet": "Walking my pet",
+    "active_time_child": "Spending a lot of active time with my child",
+    "climbing_stairs": "Climbing stairs frequently",
+    "household_tasks": "Active household tasks",
+    "no": "No"
+  },
+  "energyLevels": {
+    "title": "How are your energy levels during the day?",
+    "low_tired": "Low, I feel tired all day",
+    "crash_lunch": "I crash after lunch",
+    "caffeine": "I rely on caffeine to keep me going",
+    "high_steady": "High and steady all day"
+  },
+  "exercisePlace": {
+    "title": "Where do you prefer to exercise?",
+    "home": "Home",
+    "outside": "Outside",
+    "gym": "Gym",
+    "no_preference": "No preference"
+  },
+  "lifestyleUpgrade": {
+    "title": "Designed to upgrade your life",
+    "body": "We'll tailor our workouts to your lifestyle to help you move your body, build confidence, and have fun.",
+    "bubblesAltMale": "Men and lifestyle moments in circular frames",
+    "bubblesAltFemale": "People and lifestyle moments in circular frames"
+  },
+  "walkPerWeek": {
+    "title": "How many times per week would you like to walk?",
+    "1_2_times": "1-2 times",
+    "3_4_times": "3-4 times",
+    "5_plus_times": "5+ times",
+    "maleWalkAlt": "Man doing a side stretch, walking and fitness",
+    "femaleWalkAlt": "Woman stretching with arms raised"
+  },
+  "dailySteps": {
+    "title": "How many steps do you think you need in a day?",
+    "easy": "Easy: <5K steps",
+    "medium": "Medium: 5-10K steps",
+    "hard": "Hard: >10K steps",
+    "not_sure": "I'm not sure"
+  },
+  "transformation": {
+    "titleThey": "They did it.",
+    "titleYou": "You can do too!",
+    "titleCta": "Start your transformation today!",
+    "lilyName": "Lily Morgan",
+    "noahName": "Noah Bennett",
+    "lilyQuote": "This app turned my walks into real progress. I'm seeing the difference on the scale and in my mood!",
+    "noahQuote": "I've lost weight without even realizing it - just by walking daily with this app. It actually made fitness fun for once.",
+    "testimonialAria": "Testimonial {{n}} of {{total}}"
+  },
+  "weightGain": {
+    "title": "Have any of the following events led to weight gain?",
+    "titleQuiz": "Have any of the following events led to weight gain in the last few years?",
+    "work_pressure": "Work pressure",
+    "busy_family": "Busy family life",
+    "divorce_breakup": "Divorce or breakup",
+    "slower_metabolism": "Slower metabolism due to aging",
+    "financial": "Financial challenges",
+    "covid": "Covid-19 pandemic",
+    "injury_disability": "Injury or disability",
+    "other_stressful": "Other stressful events",
+    "none": "None of the above"
+  },
+  "motivation": {
+    "title": "What is your main motivation for losing weight?",
+    "biggestMotivationTitle": "What's your biggest motivation?",
+    "confident": "Feel more confident in my body",
+    "healthier": "Be healthier and more energetic",
+    "other": "Other"
+  },
+  "longTerm": {
+    "title": "We help you achieve long-term results",
+    "stanfordAlt": "Stanford University",
+    "chartYourWeight": "YOUR WEIGHT",
+    "chartToday": "Today",
+    "chartMonth": "In a month",
+    "chartExhausting": "With exhausting workouts",
+    "chartTaiChi": "With Tai Chi Walking",
+    "drQuote": "Dr Nick Smeeton from Stanford University",
+    "drQuoteBody": "reported that Tai Chi walking reduces fatigue, improves emotional state, and is less taxing on the body than exhausting gym workouts."
+  },
+  "height": {
+    "title": "What's your height?",
+    "subtitle": "Your plan is created according to the body mass index (BMI)"
+  },
+  "currentWeight": {
+    "title": "Your current weight",
+    "subtitle": "We will use this information to calculate your body mass index (BMI)"
+  },
+  "goalWeight": {
+    "title": "Your goal weight",
+    "subtitle": "What is the ideal weight you want to reach?"
+  },
+  "profile": {
+    "title": "Your walking profile",
+    "loadingLabel": "Progress",
+    "loadingStep1": "Analyzing your answers…",
+    "loadingStep2": "Calculating your BMI…",
+    "loadingStep3": "Assessing health risks…",
+    "loadingStep4": "Building your walking profile…",
+    "bmiHeading": "Body mass index (BMI)",
+    "youTooltip": "You - {{bmi}}",
+    "bmiUnderweight": "UNDERWEIGHT",
+    "bmiNormal": "NORMAL",
+    "bmiOverweight": "OVERWEIGHT",
+    "bmiObese": "OBESE",
+    "bandUnderweight": "Underweight",
+    "bandNormal": "Normal",
+    "bandOverweight": "Overweight",
+    "bandObese": "Obese",
+    "riskTitle": "Risks of unhealthy BMI:",
+    "riskBody": "High blood pressure, chronic back and joint pain",
+    "desiredWeight": "Desired weight",
+    "bodyDream": "Body dream",
+    "lifestyle": "Lifestyle",
+    "figureAltMale": "Male silhouette matching overweight BMI range",
+    "figureAltFemale": "Female silhouette matching overweight BMI range",
+    "walkingProfilePhotoAlt": "Smiling woman in athletic wear — your walking profile"
+  },
+  "motivationEvent": {
+    "title": "Is there any specific event motivating you to lose weight right now?",
+    "vacation": "Vacation",
+    "wedding": "Wedding",
+    "sports_event": "Sports event",
+    "summer": "Summer",
+    "school_reunion": "School reunion",
+    "family_gathering": "Family gathering",
+    "birthday_party": "Birthday party",
+    "other_occasion": "Other occasion",
+    "no_just_ready": "No — just ready to look and feel my best!"
+  },
+  "eventDate": {
+    "title": "Sounds exciting! When is the event?",
+    "subtitle": "We'll use this information for your personalized plan",
+    "eventDateSr": "Event date"
+  },
+  "prediction": {
+    "titleYouCan": "You can reach",
+    "titleBy": "by",
+    "basedOn": "Based on data from Walking members with similar profiles",
+    "months": "January,February,March,April,May,June,July,August,September,October,November,December",
+    "subPillRich": "and you'll lose {{rate}} kg for your <season>{{seasonName}}</season>",
+    "season": {
+      "spring": "Spring!",
+      "summer": "Summer!",
+      "autumn": "Fall!",
+      "winter": "Winter!"
+    },
+    "chartAria": "Weight projection from {{from}} kg to {{to}} kg",
+    "weightLossTotal": "{{kg}} kg to lose"
+  },
+  "reachConfidence": {
+    "titleBefore": "How confident are you in reaching",
+    "titleMid": "by",
+    "titleAfter": "?",
+    "believe": "I believe I can do it!",
+    "uncertain_try": "I'm uncertain, but willing to try!",
+    "not_sure": "I'm not really sure"
+  },
+  "giveUp": {
+    "title": "Why do people give up on their get-in-shape efforts?",
+    "line1": "The",
+    "reasonHash": "#1 reason",
+    "line2": "is starting too big too quickly.",
+    "body": "That's why our program aims to help you make sustainable lifestyle changes so you can transform your body and enjoy thriving health for life."
+  },
+  "emailStep": {
+    "title38": "Get your personalized program",
+    "subtitle38": "Enter your email to receive your custom Tai Chi Walking plan",
+    "placeholder38": "your@email.com",
+    "invalidEmail": "Please enter a valid email address.",
+    "emailOk": "Email address looks good.",
+    "title45a": "Enter email to get your",
+    "title45b": "Tai Chi Walking Plan",
+    "placeholder45": "Email",
+    "privacy": "We respect your privacy and are committed to protecting your personal data. We'll email you a copy of your results for convenient access."
+  },
+  "inbox": {
+    "title": "Check your inbox!",
+    "body": "We've sent your personalized Tai Chi Walking plan to",
+    "bodyEnd": "Follow the steps to start your transformation today!"
+  },
+  "reward": {
+    "titleBefore": "After reaching your goal weight, how would you",
+    "titleAccent": "reward yourself",
+    "titleAfter": "?",
+    "new_clothes": "Buying new clothes",
+    "personal_day": "Take a personal day",
+    "social_media": "Sharing it on the social media",
+    "pictures": "Taking pictures of myself",
+    "travel": "Traveling somewhere new"
+  },
+  "seeYourself": {
+    "titleBefore": "How would you",
+    "titleAccent": "see yourself",
+    "titleAfter": "after reaching your goal weight?",
+    "proud": "Being proud of myself",
+    "feeling_great": "Feeling great",
+    "believe": "Believe in myself",
+    "empowered": "Feel empowered to make healthy choices",
+    "worry_less": "Worry less about my body overall"
+  },
+  "planBuild": {
+    "creating": "Creating your personalized Walking Plan",
+    "million": "10 million people",
+    "chosen": " have chosen Walking",
+    "rachelUser": "Rachel999",
+    "rachelQuote": "Lost 4 lbs in one week. It looks easy, but it is a super calorie burner workout. Walking helps me to be more active, healthy, and happy!",
+    "rachelAlt": "Rachel"
+  },
+  "optIn": {
+    "titleBefore": "Do you want to receive emails with",
+    "titleAccent": "Weight Loss",
+    "titleAfter": "tips and our app updates?",
+    "yes": "Yes, I do",
+    "no": "I don't want to receive tips or updates"
+  },
+  "nameStep": {
+    "title": "What's your name?",
+    "subtitle": "Let us know your name, so we can address you the way you like",
+    "placeholder": "Name",
+    "nameSr": "Your name"
+  },
+  "seniorCoupleAlt": "Active older couple smiling after walking, with towels and water bottles"
+}

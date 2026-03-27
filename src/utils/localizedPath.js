@@ -6,7 +6,7 @@ import { DEFAULT_LANG, isSupportedLang } from '../constants/i18n';
  */
 export function stripLeadingLocaleFromPathname(pathname) {
   const n = pathname.replace(/\/$/, '') || '/';
-  const m = n.match(/^\/(en|lt)(\/.*)?$/);
+  const m = n.match(/^\/(en|lt|ru)(\/.*)?$/);
   if (!m) return n;
   if (!m[2] || m[2] === '/') return '/';
   return m[2];
@@ -15,7 +15,7 @@ export function stripLeadingLocaleFromPathname(pathname) {
 /**
  * Pakeičia kalbą URL, išlaikant tą pačią „loginių“ maršrutų dalį (quiz, offer, …).
  * @param {string} pathname – pilnas pathname, pvz. `/en/quiz`
- * @param {string} newLang – `en` | `lt`
+ * @param {string} newLang – `en` | `lt` | `ru`
  */
 export function swapLangInPath(pathname, newLang) {
   if (!isSupportedLang(newLang)) return pathname;

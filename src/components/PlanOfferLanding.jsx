@@ -1,20 +1,16 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Star, Question, Tag } from '@phosphor-icons/react';
-import WalkingIcon from './WalkingIcon';
 /** Before/After viename kadre – jūsų asset */
 import comparisonHeroImage from '../assets/img body fat bodyslim.webp';
 import mobilePhoneHero from '../assets/img mobilus telefonas.webp';
-import desiredWalkImg from '../assets/img mergina iskelus rankas.webp';
-import walkingProfileImg from '../assets/img walking profile.webp';
+import mobileAppScreen2 from '../assets/img tel2.png';
+import mobileAppScreen3 from '../assets/img tel3.png';
 import testimonial88 from '../assets/img 88kg.webp';
 import testimonial147 from '../assets/img 147 kg.webp';
 import laurelLeftSvg from '../assets/sakele is kaires.svg';
 import securityInfoBanner from '../assets/security-info.png';
 import offerConfig from '../configs/offerConfig.json';
-import { swapLangInPath } from '../utils/localizedPath';
-import { withPreservedQueryParams } from '../utils/preserveQueryParams';
 
 /** Iš offerConfig.json (Step 7 – be hardcode kainų / kontaktų) */
 const ORANGE = offerConfig.brand.primaryHex;
@@ -98,37 +94,26 @@ function PromoTicketCard({ promoCode, mm, ss, className = 'mb-6' }) {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-3 px-4 pb-5 pt-3 sm:grid-cols-2 sm:gap-4 sm:px-5">
-        <div className="flex min-h-[4.25rem] items-center gap-2.5 rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-gray-100/90">
-          <Check className="h-5 w-5 shrink-0 text-sky-500" weight="bold" />
-          <span className="break-all font-mono text-sm font-semibold tracking-tight text-gray-900">
-            {promoCode}
-          </span>
-        </div>
-        <div
-          className="flex min-h-[4.25rem] flex-col items-center justify-center rounded-2xl px-3 py-3 ring-1 ring-cyan-300/40"
-          style={{ backgroundColor: '#b2ebf2' }}
-        >
-          <div className="flex items-start justify-center gap-2 tabular-nums">
-            <div className="flex min-w-[2.5rem] flex-col items-center">
-              <span className="text-2xl font-bold leading-none text-sky-600 sm:text-[1.75rem]">
-                {mm}
-              </span>
-              <span className="mt-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600">
-                {t('minutes')}
-              </span>
-            </div>
-            <span className="select-none pt-1 text-xl font-light text-sky-600" aria-hidden>
+      <div className="px-4 pb-5 pt-3 sm:px-5">
+        <div className="flex min-h-[4.25rem] w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-2xl bg-white px-3 py-3 shadow-sm ring-1 ring-gray-100/90 sm:px-4">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            <Check className="h-5 w-5 shrink-0 text-sky-500" weight="bold" />
+            <span className="break-words text-base font-extrabold leading-snug tracking-tight text-gray-900 sm:text-lg">
+              {promoCode}
+            </span>
+          </div>
+          <div
+            className="flex shrink-0 items-center gap-1 rounded-xl px-2 py-1.5 tabular-nums text-sky-800 ring-1 ring-cyan-300/50"
+            style={{ backgroundColor: '#b2ebf2' }}
+          >
+            <span className="text-lg font-bold leading-none sm:text-xl">{mm}</span>
+            <span className="select-none text-base font-light text-sky-700/90" aria-hidden>
               :
             </span>
-            <div className="flex min-w-[2.5rem] flex-col items-center">
-              <span className="text-2xl font-bold leading-none text-sky-600 sm:text-[1.75rem]">
-                {ss}
-              </span>
-              <span className="mt-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600">
-                {t('seconds')}
-              </span>
-            </div>
+            <span className="text-lg font-bold leading-none sm:text-xl">{ss}</span>
+            <span className="ml-0.5 whitespace-nowrap text-[9px] font-bold uppercase leading-none text-gray-700 sm:text-[10px]">
+              {t('minutesAbbr')} : {t('secondsAbbr')}
+            </span>
           </div>
         </div>
       </div>
@@ -185,8 +170,14 @@ function PlanRadiosSection({ plans, planId, setPlanId, radioGroupSuffix = 'a', c
                     value={p.id}
                     checked={selected}
                     onChange={() => setPlanId(p.id)}
-                    className="mt-1.5 h-4 w-4 shrink-0 accent-[#ff6b3d]"
+                    className="peer sr-only"
                   />
+                  <span
+                    className="mt-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 border-gray-300 bg-white peer-checked:border-[#ff6b3d] peer-checked:bg-[#ff6b3d] [&>svg]:opacity-0 peer-checked:[&>svg]:opacity-100"
+                    aria-hidden
+                  >
+                    <Check className="h-3.5 w-3.5 text-white" weight="bold" />
+                  </span>
                   <div className="min-w-0 flex-1">
                     <div className="text-base font-bold leading-tight text-gray-900">
                       {p.titleKey ? t(p.titleKey) : ''}
@@ -200,16 +191,21 @@ function PlanRadiosSection({ plans, planId, setPlanId, radioGroupSuffix = 'a', c
                     </div>
                     <div className="mt-2 flex flex-wrap items-baseline gap-2">
                       <span className="text-sm text-gray-400 line-through">{p.was}</span>
-                      <span className="text-lg font-bold text-gray-900">{p.now}</span>
+                      <span className="text-base font-bold text-gray-900">{p.now}</span>
                     </div>
                   </div>
                   <div
-                    className={`flex w-[5.75rem] shrink-0 flex-col items-center justify-center rounded-r-2xl rounded-l-md px-2 py-2 text-center ${
+                    className={`relative flex min-w-[5.75rem] shrink-0 flex-col items-center justify-center py-2 pl-4 pr-2 text-center [clip-path:polygon(0_50%,14px_0,100%_0,100%_100%,14px_100%)] ${
                       selected ? 'bg-[#ff6b3d] text-white' : 'bg-gray-100 text-gray-900'
                     }`}
                   >
-                    <span className={`text-base font-bold ${selected ? 'text-white' : 'text-gray-900'}`}>
-                      $0{p.perDay}
+                    <span
+                      className={`flex items-baseline justify-center gap-0 font-bold leading-none ${
+                        selected ? 'text-white' : 'text-gray-900'
+                      }`}
+                    >
+                      <span className="text-xl font-extrabold sm:text-2xl">$0</span>
+                      <span className="text-base font-bold">{p.perDay}</span>
                     </span>
                     <span
                       className={`mt-0.5 text-[10px] font-medium leading-tight ${
@@ -241,10 +237,7 @@ function PlanOfferLanding({
   onGetPlan,
 }) {
   const { t: tOffer } = useTranslation('offer');
-  const { t: tCommon, i18n } = useTranslation();
-  const location = useLocation();
-  const otherLang = i18n.language?.startsWith('lt') ? 'en' : 'lt';
-  const langSwitchHref = withPreservedQueryParams(swapLangInPath(location.pathname, otherLang));
+  const { t: tCommon } = useTranslation();
   const [secondsLeft, setSecondsLeft] = useState(COUNTDOWN_TOTAL_SECONDS);
   const [planId, setPlanId] = useState('4w');
   const [appSlide, setAppSlide] = useState(0);
@@ -269,7 +262,48 @@ function PlanOfferLanding({
       ? `${targetWeightKg} kg`
       : `${targetWeightKg} kg`;
 
-  const appImages = [mobilePhoneHero, desiredWalkImg, walkingProfileImg];
+  const appImages = useMemo(
+    () => [mobilePhoneHero, mobileAppScreen2, mobileAppScreen3],
+    [],
+  );
+
+  const appCarouselSwipeRef = useRef({ x: null, y: null, pointerId: null });
+
+  const handleAppCarouselPointerDown = useCallback((e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const el = e.currentTarget;
+    if (el instanceof HTMLElement) {
+      try {
+        el.setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+    }
+    appCarouselSwipeRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      pointerId: e.pointerId,
+    };
+  }, []);
+
+  const handleAppCarouselPointerUp = useCallback((e) => {
+    const start = appCarouselSwipeRef.current;
+    if (start.x == null || start.y == null) return;
+    if (start.pointerId != null && e.pointerId !== start.pointerId) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    appCarouselSwipeRef.current = { x: null, y: null, pointerId: null };
+    const minSwipe = 40;
+    if (Math.abs(dx) < minSwipe) return;
+    if (Math.abs(dx) < Math.abs(dy)) return;
+    const n = appImages.length;
+    if (dx < 0) setAppSlide((i) => (i + 1) % n);
+    else setAppSlide((i) => (i - 1 + n) % n);
+  }, [appImages.length]);
+
+  const handleAppCarouselPointerCancel = useCallback(() => {
+    appCarouselSwipeRef.current = { x: null, y: null, pointerId: null };
+  }, []);
   const stories = useMemo(
     () => [
       {
@@ -310,29 +344,23 @@ function PlanOfferLanding({
 
   return (
     <div className="min-h-screen overflow-x-clip bg-white pb-[calc(4rem+env(safe-area-inset-bottom,0px))] font-sans text-gray-900">
-      {/* Baltas headeris: logo centre, dešinėje laikmatis + oranžinis CTA (be pilno pločio „juostos“) */}
+      {/* Baltas headeris: laikmatis + „Get My Plan“ (be logo) */}
       <header className="sticky top-0 z-20 border-b border-gray-200 bg-white pt-[env(safe-area-inset-top,0px)] shadow-[0_1px_0_rgba(0,0,0,0.04)]">
-        {/* Tik logotipas centre – be atgal / meniu */}
-        <div className="mx-auto flex max-w-lg justify-center px-4 py-3">
-          <WalkingIcon showLabel size="md" />
-        </div>
-
-        {/* 2 eilutė: laikmatis šalia „Get My Plan“ (viena eilutė), skaičiai oranžiniai, mygtukas su rėmeliu + pulse */}
-        <div className="mx-auto flex max-w-lg flex-wrap items-end justify-center gap-3 border-t border-gray-100 px-4 pb-3 pt-3 sm:flex-nowrap sm:justify-between sm:gap-4">
-          <div className="flex min-w-0 flex-1 items-end justify-center gap-1 tabular-nums sm:flex-initial sm:justify-start sm:gap-2">
+        <div className="mx-auto flex max-w-lg flex-wrap items-end justify-center gap-3.5 px-4 py-3.5 sm:flex-nowrap sm:justify-between sm:gap-5">
+          <div className="flex min-w-0 flex-1 items-end justify-center gap-1.5 tabular-nums sm:flex-initial sm:justify-start sm:gap-2.5">
             <div className="text-center">
               <div
-                className="text-2xl font-bold leading-none tracking-tight sm:text-[1.75rem]"
+                className="text-3xl font-bold leading-none tracking-tight sm:text-[2rem]"
                 style={{ color: ORANGE }}
               >
                 {mm}
               </div>
-              <div className="mt-1 text-[10px] font-medium uppercase tracking-wide text-gray-600">
+              <div className="mt-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-600 sm:text-xs">
                 {tOffer('minutes')}
               </div>
             </div>
             <span
-              className="pb-3 text-lg font-light leading-none sm:pb-3.5 sm:text-xl"
+              className="pb-4 text-xl font-light leading-none sm:pb-[1.125rem] sm:text-2xl"
               style={{ color: ORANGE }}
               aria-hidden
             >
@@ -340,26 +368,24 @@ function PlanOfferLanding({
             </span>
             <div className="text-center">
               <div
-                className="text-2xl font-bold leading-none tracking-tight sm:text-[1.75rem]"
+                className="text-3xl font-bold leading-none tracking-tight sm:text-[2rem]"
                 style={{ color: ORANGE }}
               >
                 {ss}
               </div>
-              <div className="mt-1 text-[10px] font-medium uppercase tracking-wide text-gray-600">
+              <div className="mt-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-600 sm:text-xs">
                 {tOffer('seconds')}
               </div>
             </div>
           </div>
-          <div className="shrink-0 rounded-full border-2 border-gray-200 bg-gray-50 p-1 shadow-sm ring-1 ring-black/[0.03]">
-            <button
-              type="button"
-              onClick={handleGetPlan}
-              className="block max-w-full rounded-full px-3.5 py-2 text-center text-xs font-bold text-white shadow-md transition hover:brightness-105 active:scale-[0.98] motion-safe:animate-pulse sm:px-5 sm:py-2.5 sm:text-sm"
-              style={PRIMARY_BTN_STYLE}
-            >
-              {tOffer('getMyPlan')}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleGetPlan}
+            className="touch-manipulation block max-w-full origin-center shrink-0 rounded-full px-4 py-2.5 text-center text-sm font-bold text-white ring-2 ring-[#ff6b3d]/35 ring-offset-2 ring-offset-white transition will-change-transform hover:brightness-105 active:scale-[0.97] motion-safe:animate-offer-cta-pulse sm:px-6 sm:py-3 sm:text-base"
+            style={PRIMARY_BTN_STYLE}
+          >
+            {tOffer('getMyPlan')}
+          </button>
         </div>
       </header>
 
@@ -465,7 +491,12 @@ function PlanOfferLanding({
 
         {/* Mobilios app nuotraukos */}
         <h2 className="mb-3 text-xl font-bold">{tOffer('mobileAppHeading')}</h2>
-        <div className="relative mb-2 w-full overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200/60">
+        <div
+          className="relative mb-2 w-full touch-manipulation overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200/60"
+          onPointerDown={handleAppCarouselPointerDown}
+          onPointerUp={handleAppCarouselPointerUp}
+          onPointerCancel={handleAppCarouselPointerCancel}
+        >
           <div
             className="flex transition-transform duration-300 ease-out"
             style={{ transform: `translateX(-${appSlide * 100}%)` }}
@@ -478,12 +509,8 @@ function PlanOfferLanding({
                 <img
                   src={src}
                   alt=""
-                  className={
-                    i === 0
-                      ? 'absolute left-0 top-1/2 max-h-full max-w-full -translate-y-1/2 object-contain object-left pl-1 sm:pl-2'
-                      : 'absolute inset-0 h-full w-full object-cover object-center'
-                  }
-                  loading="lazy"
+                  className="absolute left-0 top-1/2 max-h-full w-full max-w-full -translate-y-1/2 object-contain object-left pl-1 sm:pl-2"
+                  loading={i === 0 ? 'eager' : 'lazy'}
                   decoding="async"
                 />
               </div>
@@ -687,7 +714,7 @@ function PlanOfferLanding({
           <img
             src={securityInfoBanner}
             alt={tOffer('securityBannerAlt')}
-            className="mx-auto block h-auto w-full max-w-[280px] object-contain"
+            className="mx-auto block h-auto w-full max-w-[160px] object-contain"
             loading="lazy"
             decoding="async"
           />
@@ -704,7 +731,7 @@ function PlanOfferLanding({
           </p>
         </section>
 
-        <section className="space-y-6 border-t border-gray-100 pt-8 text-sm text-gray-600">
+        <section className="space-y-6 border-t border-gray-100 pb-10 pt-8 text-sm text-gray-600">
           <div>
             <h2 className="mb-2 text-lg font-bold text-gray-900">{tOffer('infoSafeTitle')}</h2>
             <p>{tOffer('infoSafeBody')}</p>
@@ -723,12 +750,6 @@ function PlanOfferLanding({
             </p>
           </div>
         </section>
-
-        <p className="pb-10 pt-4 text-center text-sm text-gray-500">
-          <Link to={langSwitchHref} className="font-medium text-[#ff6b3d] underline underline-offset-2">
-            {otherLang === 'lt' ? tCommon('common.switchToLt') : tCommon('common.switchToEn')}
-          </Link>
-        </p>
       </main>
     </div>
   );

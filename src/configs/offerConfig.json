@@ -4,6 +4,7 @@
   },
   "urls": {
     "terms": "https://info.walkingfl.fit/terms-of-use",
+    "privacy": "https://info.walkingfl.fit/privacy-policy",
     "supportEmail": "support@walkingfl.fit"
   },
   "countdownSeconds": 600,

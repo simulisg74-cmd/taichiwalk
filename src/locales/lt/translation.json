@@ -6,8 +6,8 @@
     "splash": {
       "leadIn": "Ženkite pirmą žingsnį",
       "titleLine1": "Tai Chi:",
-      "titleLine2": "Transformuok",
-      "titleLine3": "savo EISĄ!",
+      "titleLine2": "Transformuok!",
+      "titleLine3": "savo Ėjimą!",
       "loadingLabel": "Kraunama apklausa"
     },
     "gender": {
@@ -20,13 +20,13 @@
     "trust": {
       "headlineFemale": "10 milijonų moterų",
       "headlineMale": "10 milijonų vyrų",
-      "subline": "pasitiki Walking savo fitneso tikslais",
-      "sublineRich": "pasitiki <w>Walking</w> savo fitneso tikslais",
-      "heroAltFemale": "Moterys Walking programoje",
-      "heroAltMale": "Vyrai Walking programoje"
+      "subline": "pasitiki Ėjimu savo fitneso tikslais",
+      "sublineRich": "pasitiki <w>Ėjimu</w> savo fitneso tikslais",
+      "heroAltFemale": "Moterys Ėjimo programoje",
+      "heroAltMale": "Vyrai Ėjimo programoje"
     },
     "age": {
-      "heading": "Personalizuotas Tai Chi vaikščiojimo planas",
+      "heading": "Personalizuotas Tai Chi ėjimo planas",
       "basedOnAge": "Pagal jūsų amžių",
       "subheading": "Pasirinkite amžiaus grupę",
       "option4049": "Amžius: 40–49",
@@ -63,9 +63,12 @@
     "offerMissing": "Šiam keliui nėra pasiūlymo konfigūracijos.",
     "noPlans": "Planų parinkčių nėra.",
     "switchToEn": "English",
-    "switchToLt": "Lietuvių"
+    "switchToLt": "Lietuvių",
+    "switchToRu": "Русский",
+    "restartQuiz": "Pradėti apklausą iš naujo",
+    "restartQuizConfirm": "Ištrinti išsaugotą progresą ir pradėti apklausą nuo pradžių?"
   },
   "brand": {
-    "walking": "Walking"
+    "walking": "Ėjimas"
   }
 }

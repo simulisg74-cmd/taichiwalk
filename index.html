@@ -3,12 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <!-- Step 12: status bar / naršyklės chrome spalva = puslapio fonas (#FFFFFF); mažina mismatch Android Chrome / iOS -->
-    <meta name="theme-color" content="#FFFFFF" />
+    <!-- Status bar / naršyklės chrome (Android + naršyklės); juoda juosta viršuje -->
+    <meta name="theme-color" content="#000000" />
     <meta name="color-scheme" content="light" />
-    <!-- iOS Safari (PWA / priartinimas): šviesi būsena atitinka baltą foną -->
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- iOS Safari: permatoma tamsi būsena, turinys po status bar (safe-area) -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Tai Chi Walk</title>
+    <!-- Kol neįkraunamas Vite modulis / CSS – bent pilnas aukštis ir be numatyto body margin -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        min-height: 100vh;
+        min-height: 100dvh;
+        background: #fff;
+      }
+      #root {
+        min-height: 100vh;
+        min-height: 100dvh;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

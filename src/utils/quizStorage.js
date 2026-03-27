@@ -1,3 +1,6 @@
+import { DEFAULT_LANG, isSupportedLang } from '../constants/i18n';
+import { withPreservedQueryParams } from './preserveQueryParams';
+
 /**
  * Step 9: apklausos progresas localStorage su TTL.
  * - Nebaigta apklausa: 3 min nuo paskutinio įrašymo
@@ -87,4 +90,12 @@ export function clearQuizProgress() {
   } catch {
     /* ignore */
   }
+}
+
+/** Išvalo progresą ir pilnai perkrauna `/quiz` (QuizApp perskaito tuščią storage). */
+export function restartQuizWithFullReload(langFromRoute) {
+  if (typeof window === 'undefined') return;
+  clearQuizProgress();
+  const l = isSupportedLang(langFromRoute) ? langFromRoute : DEFAULT_LANG;
+  window.location.assign(withPreservedQueryParams(`/${l}/quiz`));
 }

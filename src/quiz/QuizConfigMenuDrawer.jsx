@@ -1,29 +1,40 @@
 import { X, Envelope } from '@phosphor-icons/react';
 import { useTranslation } from 'react-i18next';
-import { Link, useLocation } from 'react-router-dom';
+import { createPortal } from 'react-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import offerConfig from '../configs/offerConfig.json';
 import { swapLangInPath } from '../utils/localizedPath';
 import { withPreservedQueryParams } from '../utils/preserveQueryParams';
+import { nextCyclicLang, switchToLangLabelKey } from '../utils/langCycle';
+import { restartQuizWithFullReload } from '../utils/quizStorage';
 
 const SUPPORT_EMAIL = offerConfig.urls.supportEmail;
+const TERMS_OF_USE_URL = offerConfig.urls.terms;
+const PRIVACY_POLICY_URL = offerConfig.urls.privacy ?? offerConfig.urls.terms;
 
 export function QuizConfigMenuDrawer({ open, onClose }) {
   const { t, i18n } = useTranslation();
+  const { lang } = useParams();
   const location = useLocation();
-  const otherLang = i18n.language?.startsWith('lt') ? 'en' : 'lt';
-  const langSwitchTo = withPreservedQueryParams(swapLangInPath(location.pathname, otherLang));
+  const nextLang = nextCyclicLang(i18n.language);
+  const langSwitchTo = withPreservedQueryParams(swapLangInPath(location.pathname, nextLang));
+
+  const handleRestartQuiz = () => {
+    if (!window.confirm(t('common.restartQuizConfirm'))) return;
+    restartQuizWithFullReload(lang);
+  };
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex" role="dialog" aria-modal="true" aria-labelledby="config-quiz-menu-title">
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex" role="dialog" aria-modal="true" aria-labelledby="config-quiz-menu-title">
       <button
         type="button"
-        className="absolute inset-0 bg-black/40"
+        className="absolute inset-0 bg-black/40 touch-manipulation"
         onClick={onClose}
         aria-label={t('common.closeMenu')}
       />
-      <aside className="relative ml-auto flex h-full w-full max-w-sm flex-col bg-white pb-[env(safe-area-inset-bottom,0px)] pt-[env(safe-area-inset-top,0px)] shadow-2xl">
+      <aside className="relative z-[1] ml-auto flex h-full max-h-[100dvh] w-full max-w-sm flex-col overflow-y-auto bg-white pb-[env(safe-area-inset-bottom,0px)] pt-[env(safe-area-inset-top,0px)] shadow-2xl">
         <div className="flex shrink-0 items-start p-4">
           <button
             type="button"
@@ -44,18 +55,29 @@ export function QuizConfigMenuDrawer({ open, onClose }) {
               className="text-sm font-semibold text-orange-600 underline-offset-2 hover:underline"
               onClick={onClose}
             >
-              {otherLang === 'lt' ? t('common.switchToLt') : t('common.switchToEn')}
+              {t(switchToLangLabelKey(nextLang))}
             </Link>
           </div>
+          <button
+            type="button"
+            onClick={handleRestartQuiz}
+            className="text-left text-lg font-semibold text-orange-600 underline-offset-2 transition-colors hover:text-orange-700 hover:underline"
+          >
+            {t('common.restartQuiz')}
+          </button>
           <a
-            href="#terms"
+            href={TERMS_OF_USE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-lg font-medium text-slate-800 transition-colors hover:text-orange-600"
             onClick={onClose}
           >
             {t('common.termsOfUse')}
           </a>
           <a
-            href="#privacy"
+            href={PRIVACY_POLICY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-lg font-medium text-slate-800 transition-colors hover:text-orange-600"
             onClick={onClose}
           >
@@ -80,6 +102,7 @@ export function QuizConfigMenuDrawer({ open, onClose }) {
           </div>
         </nav>
       </aside>
-    </div>
+    </div>,
+    document.body,
   );
 }

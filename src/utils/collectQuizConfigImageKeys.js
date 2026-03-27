@@ -29,9 +29,9 @@ export function collectAssetKeysFromQuizStep(step) {
  * Kitų `lookahead` žingsnių (iš eilės) asset raktai.
  * @param {Record<string, unknown>[]} steps
  * @param {number} currentIndex
- * @param {number} [lookahead=2]
+ * @param {number} [lookahead=3]
  */
-export function collectUpcomingQuizConfigImageKeys(steps, currentIndex, lookahead = 2) {
+export function collectUpcomingQuizConfigImageKeys(steps, currentIndex, lookahead = 3) {
   const keys = new Set();
   for (let i = 1; i <= lookahead; i++) {
     const step = steps[currentIndex + i];

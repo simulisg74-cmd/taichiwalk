@@ -9,7 +9,7 @@ import { getQuizAsset } from './quizAssets';
  * @param {{ lookahead?: number; enabled?: boolean }} [options]
  */
 export function useImagePreloader(steps, currentIndex, options = {}) {
-  const { lookahead = 2, enabled = true } = options;
+  const { lookahead = 3, enabled = true } = options;
 
   useEffect(() => {
     if (!enabled || !Array.isArray(steps) || steps.length === 0) return;

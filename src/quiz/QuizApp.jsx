@@ -45,10 +45,10 @@ export default function QuizApp() {
   const totalSeg = meta.totalProgressSegments ?? 49;
   const legacyStep = meta.legacyHandoffStep ?? 6;
 
-  /** Step 8: preload paveikslėliams +2 žingsnius (tik konfigū fazėje) */
+  /** Step 8: preload paveikslėliams +3 žingsnius (tik konfigū fazėje) */
   useImagePreloader(flow.steps, flow.index, {
     enabled: !startLegacyOnly && !flow.doneConfig,
-    lookahead: 2,
+    lookahead: 3,
   });
 
   /** Step 9: konfigū fazės įrašymas */
@@ -117,8 +117,27 @@ export default function QuizApp() {
   const handoffGender = flow.answers.gender ?? '';
   const handoffGoals = Array.isArray(flow.answers.goals) ? flow.answers.goals : [];
 
+  const legacyAnswersForQuiz = useMemo(() => {
+    const base =
+      initialSaved?.answers && typeof initialSaved.answers === 'object'
+        ? { ...initialSaved.answers }
+        : {};
+    if (!startLegacyOnly) {
+      return {
+        ...base,
+        gender: handoffGender,
+        goals: handoffGoals,
+      };
+    }
+    return base;
+  }, [startLegacyOnly, initialSaved, handoffGender, handoffGoals]);
+
   const legacyQuiz = useMemo(() => {
-    const stepFromStorage = startLegacyOnly ? initialSaved.legacyStep : legacyStep;
+    const rawStep = startLegacyOnly ? initialSaved.legacyStep : legacyStep;
+    const coerced = rawStep ?? legacyStep;
+    /** 52 = tik peradresavimas į /offer; /quiz turi atverti paskutinį apklausos ekraną (51), ne offer. */
+    /** 44 = pašalintas žingsnis – nukreipti į 45 (el. paštas). */
+    const initialQuizStep = coerced === 52 ? 51 : coerced === 44 ? 45 : coerced;
     const g = startLegacyOnly
       ? (initialSaved.answers?.gender ?? '')
       : handoffGender;
@@ -130,9 +149,10 @@ export default function QuizApp() {
 
     return (
       <Quiz
-        initialStep={stepFromStorage ?? legacyStep}
+        initialStep={initialQuizStep}
         initialGender={g}
         initialSelectedGoals={gl}
+        initialLegacyAnswers={legacyAnswersForQuiz}
       />
     );
   }, [
@@ -141,6 +161,7 @@ export default function QuizApp() {
     legacyStep,
     handoffGender,
     handoffGoals,
+    legacyAnswersForQuiz,
   ]);
 
   if (startLegacyOnly) {
@@ -159,12 +180,7 @@ export default function QuizApp() {
   const pct = progressPercent(step.progressNumerator);
 
   if (step.type === 'splash') {
-    return (
-      <>
-        <StepSplash step={step} design={designConfig} onComplete={advanceFromSplash} />
-        <QuizConfigMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} />
-      </>
-    );
+    return <StepSplash step={step} design={designConfig} onComplete={advanceFromSplash} />;
   }
 
   if (step.type === 'gender_select') {
@@ -211,59 +227,47 @@ export default function QuizApp() {
 
   if (step.type === 'trust_hero') {
     return (
-      <>
-        <StepTrustHero
-          step={step}
-          design={designConfig}
-          gender={flow.answers.gender ?? ''}
-          progressPercent={pct}
-          onBack={flow.goBack}
-          onMenu={() => setMenuOpen(true)}
-          onContinue={onTrustContinue}
-        />
-        <QuizConfigMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} />
-      </>
+      <StepTrustHero
+        step={step}
+        design={designConfig}
+        gender={flow.answers.gender ?? ''}
+        progressPercent={pct}
+        onBack={flow.goBack}
+        onContinue={onTrustContinue}
+      />
     );
   }
 
   if (step.type === 'age_grid') {
     return (
-      <>
-        <StepAgeGrid
-          step={step}
-          design={designConfig}
-          gender={flow.answers.gender ?? ''}
-          progressPercent={pct}
-          selectedValue={flow.answers.ageRange}
-          onSelect={onAgeSelect}
-          onBack={flow.goBack}
-          onMenu={() => setMenuOpen(true)}
-        />
-        <QuizConfigMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} />
-      </>
+      <StepAgeGrid
+        step={step}
+        design={designConfig}
+        gender={flow.answers.gender ?? ''}
+        progressPercent={pct}
+        selectedValue={flow.answers.ageRange}
+        onSelect={onAgeSelect}
+        onBack={flow.goBack}
+      />
     );
   }
 
   if (step.type === 'goals_multi') {
     const goals = Array.isArray(flow.answers.goals) ? flow.answers.goals : [];
     return (
-      <>
-        <StepGoalsMulti
-          step={step}
-          design={designConfig}
-          progressPercent={pct}
-          selected={goals}
-          onToggle={(v) => {
-            const key = step.answerKey ?? 'goals';
-            const next = goals.includes(v) ? goals.filter((x) => x !== v) : [...goals, v];
-            flow.setAnswer(key, next);
-          }}
-          onContinue={goalsContinue}
-          onBack={flow.goBack}
-          onMenu={() => setMenuOpen(true)}
-        />
-        <QuizConfigMenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)} />
-      </>
+      <StepGoalsMulti
+        step={step}
+        design={designConfig}
+        progressPercent={pct}
+        selected={goals}
+        onToggle={(v) => {
+          const key = step.answerKey ?? 'goals';
+          const next = goals.includes(v) ? goals.filter((x) => x !== v) : [...goals, v];
+          flow.setAnswer(key, next);
+        }}
+        onContinue={goalsContinue}
+        onBack={flow.goBack}
+      />
     );
   }
 

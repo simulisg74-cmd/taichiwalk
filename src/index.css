@@ -6,6 +6,10 @@
   /* Step 12: tas pats fonas kaip theme-color – mažiau „flash“ prieš hidrantą ir per perėjimus */
   html,
   body {
+    margin: 0;
+    /* Pilnas viewport aukštis – kitaip tuščias dokumentas gali „susitraukti“ (pvz. ~8px inspektoriuje). */
+    min-height: 100vh;
+    min-height: 100dvh;
     background-color: #ffffff;
     color-scheme: light;
   }

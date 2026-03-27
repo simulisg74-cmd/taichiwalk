@@ -15,7 +15,7 @@ const QUIZ_ICON_CLASS = 'text-blue-500 shrink-0';
  *   onToggle: (value: string) => void,
  *   onContinue: () => void,
  *   onBack: () => void,
- *   onMenu: () => void,
+ *   onMenu?: () => void,
  * }} props
  */
 export function StepGoalsMulti({
@@ -48,14 +48,18 @@ export function StepGoalsMulti({
         <div className="flex justify-center">
           <WalkingIcon showLabel size="md" />
         </div>
-        <button
-          type="button"
-          onClick={onMenu}
-          className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-gray-600 transition-colors hover:bg-gray-50"
-          aria-label={t('common.menu')}
-        >
-          <List size={24} weight="bold" className="text-gray-600" />
-        </button>
+        {onMenu ? (
+          <button
+            type="button"
+            onClick={onMenu}
+            className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-gray-600 transition-colors hover:bg-gray-50"
+            aria-label={t('common.menu')}
+          >
+            <List size={24} weight="bold" className="text-gray-600" />
+          </button>
+        ) : (
+          <span className="justify-self-end" aria-hidden />
+        )}
       </header>
 
       <div className={shell.progressTrack}>
@@ -63,7 +67,7 @@ export function StepGoalsMulti({
       </div>
 
       <main className={cn(shell.main, 'w-full')}>
-        <div className="flex w-full max-w-md flex-col">
+        <div className="flex w-full max-w-md flex-col pb-4">
           <div className="space-y-6">
             <div className="space-y-2 text-center">
               <div className="flex items-center justify-center gap-2">
@@ -115,19 +119,19 @@ export function StepGoalsMulti({
               <span className="text-sm font-medium">{t(i18nKeys.validationKey ?? '')}</span>
             </div>
           ) : null}
-
-          <div className="mt-8 flex justify-center border-t border-gray-200 pt-6">
-            <button
-              type="button"
-              onClick={onContinue}
-              disabled={!hasAny}
-              className={design.buttons.continueDisabled}
-            >
-              {t(i18nKeys.continueKey ?? 'quiz.common.continue')}
-            </button>
-          </div>
         </div>
       </main>
+
+      <div className="flex shrink-0 justify-center border-t border-gray-200 bg-white px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
+        <button
+          type="button"
+          onClick={onContinue}
+          disabled={!hasAny}
+          className={design.buttons.continueDisabled}
+        >
+          {t(i18nKeys.continueKey ?? 'quiz.common.continue')}
+        </button>
+      </div>
     </div>
   );
 }

@@ -13,7 +13,7 @@ import { getQuizAsset } from '../quiz/quizAssets';
  *   selectedValue: string | undefined,
  *   onSelect: (value: string) => void,
  *   onBack: () => void,
- *   onMenu: () => void,
+ *   onMenu?: () => void,
  * }} props
  */
 export function StepAgeGrid({
@@ -49,14 +49,18 @@ export function StepAgeGrid({
         <div className="flex justify-center">
           <WalkingIcon showLabel size="md" />
         </div>
-        <button
-          type="button"
-          onClick={onMenu}
-          className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-gray-600 transition-colors hover:bg-gray-50"
-          aria-label={t('common.menu')}
-        >
-          <List size={24} weight="bold" className="text-gray-600" />
-        </button>
+        {onMenu ? (
+          <button
+            type="button"
+            onClick={onMenu}
+            className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-gray-600 transition-colors hover:bg-gray-50"
+            aria-label={t('common.menu')}
+          >
+            <List size={24} weight="bold" className="text-gray-600" />
+          </button>
+        ) : (
+          <span className="justify-self-end" aria-hidden />
+        )}
       </header>
 
       <div className={shell.progressTrack}>

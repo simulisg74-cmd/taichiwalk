@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useParams, Link, useLocation } from 'react-router-dom';
 import { useTranslation, Trans } from 'react-i18next';
 import WalkingIcon from './WalkingIcon';
 import { withPreservedQueryParams } from '../utils/preserveQueryParams';
 import { buildLocalizedOfferPath, swapLangInPath } from '../utils/localizedPath';
+import { nextCyclicLang, switchToLangLabelKey } from '../utils/langCycle';
 import {
   HelpCircle,
   CheckCircle,
@@ -123,6 +125,7 @@ import stairsMenOutOfBreath from '../assets/img men out of breath.webp';
 import stairsMenSometimesTired from '../assets/img men sometimes tired but this ok.webp';
 import stairsMenEasily from '../assets/img men easily.webp';
 import energyHighIntensityDiagram from '../assets/img deagrama.webp';
+import longTermResultsChartSvg from '../assets/degramos atvaizdas.svg';
 import sleepInBedHeroImage from '../assets/img mergina lovoje.webp';
 import sleepMenInBedHeroImage from '../assets/img men lovje razosi.webp';
 import lifestyleBubblesImage from '../assets/img burbuliukai su zmonem.webp';
@@ -136,11 +139,31 @@ import testimonialSlide147kg from '../assets/img 147 kg.webp';
 import drNikoAmblemaImage from '../assets/img drNiko amblema.webp';
 import seniorCoupleHeroImage from '../assets/img senokas su mociute.png';
 import firstPageBackgroundImage from '../assets/pirmas puslapis.webp';
+import walkingProfileHeroImage from '../assets/img walking profile.webp';
 import laurelLeftSvg from '../assets/sakele is kaires.svg';
 import taiChiPromoMaleHeroImage from '../assets/men ant kilimelio istieses rankas.jpg';
 import quizConfig from '../configs/quizConfig.json';
 import offerConfig from '../configs/offerConfig.json';
-import { writeQuizProgress } from '../utils/quizStorage';
+import { writeQuizProgress, restartQuizWithFullReload } from '../utils/quizStorage';
+import { useLegacyQuizImagePrefetch } from '../quiz/useLegacyQuizImagePrefetch';
+
+/** Step 28: „They did it“ – karuselė (nuotrauka + svoriai + citata); swipe / intervalas naudoja šį masyvą */
+const TRANSFORMATION_TESTIMONIALS = [
+  {
+    heroImage: testimonialSlide88kg,
+    beforeWeight: '88 KG',
+    afterWeight: '80 kg',
+    nameKey: 'lilyName',
+    quoteKey: 'lilyQuote',
+  },
+  {
+    heroImage: testimonialSlide147kg,
+    beforeWeight: '147 KG',
+    afterWeight: '108 kg',
+    nameKey: 'noahName',
+    quoteKey: 'noahQuote',
+  },
+];
 
 /** Amžiaus kortelės – vietinės nuotraukos (baltas fonas), eilė: 40–49 … 70–80 */
 const FEMALE_AGE_IMAGES = {
@@ -166,6 +189,15 @@ const PLAN_BUILD_LOADER_MS = 3200;
 const PLAN_BUILD_START_PERCENT = 0;
 const PLAN_BUILD_CIRCLE_R = 45;
 const PLAN_BUILD_CIRCUMFERENCE = 2 * Math.PI * PLAN_BUILD_CIRCLE_R;
+
+/** Prognozės ekranas: metų laikas pagal tikslo datą (šiaurės pusrutulis, meteorologiniai mėnesiai). */
+function getSeasonIdForQuizPrediction(d) {
+  const m = d.getMonth();
+  if (m >= 2 && m <= 4) return 'spring';
+  if (m >= 5 && m <= 7) return 'summer';
+  if (m >= 8 && m <= 10) return 'autumn';
+  return 'winter';
+}
 
 const BODY_TYPE_IMAGES = {
   slim: bodyTypeSlim,
@@ -258,7 +290,7 @@ const QUIZ_PROGRESS_NUMERATOR_BY_STEP = {
   1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10, 11: 11, 12: 12, 13: 13,
   14: 14, 15: 14, 16: 19, 17: 20, 18: 22, 19: 23, 20: 15, 21: 16, 22: 17, 23: 18,
   24: 24, 25: 21, 26: 25, 27: 26, 28: 27, 29: 28, 30: 29, 31: 30, 32: 31, 33: 32, 34: 33,
-  35: 35, 36: 36, 37: 38, 38: 42, 39: 42.5, 40: 41, 41: 42, 42: 34, 43: 43, 44: 44, 45: 45, 46: 46,
+  35: 35, 36: 36, 37: 38, 38: 42, 39: 42.5, 40: 41, 41: 42, 42: 34, 43: 43, 44: 45, 45: 45, 46: 46,
   47: 37, 48: 39, 49: 40, 50: 47, 51: 48, 52: 49,
 };
 
@@ -280,25 +312,38 @@ const GENDER_ACCENT_CLASS = 'text-[#c85a3c]';
 
 /** Palaikymo el. paštas – iš offerConfig.json */
 const QUIZ_SUPPORT_EMAIL = offerConfig.urls.supportEmail;
+const TERMS_OF_USE_URL = offerConfig.urls.terms;
+const PRIVACY_POLICY_URL = offerConfig.urls.privacy ?? offerConfig.urls.terms;
 
 /** Šoninis meniu – Terms, Privacy, Help + kalbos jungiklis (query išsaugomas) */
 function QuizMenuDrawer({ open, onClose }) {
   const { t, i18n } = useTranslation();
+  const { lang } = useParams();
   const location = useLocation();
-  const otherLang = i18n.language?.startsWith('lt') ? 'en' : 'lt';
-  const langSwitchTo = withPreservedQueryParams(swapLangInPath(location.pathname, otherLang));
+  const nextLang = nextCyclicLang(i18n.language);
+  const langSwitchTo = withPreservedQueryParams(swapLangInPath(location.pathname, nextLang));
+
+  const handleRestartQuiz = () => {
+    if (!window.confirm(t('common.restartQuizConfirm'))) return;
+    restartQuizWithFullReload(lang);
+  };
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex" role="dialog" aria-modal="true" aria-labelledby="quiz-menu-title">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[200] flex"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="quiz-menu-title"
+    >
       <button
         type="button"
-        className="absolute inset-0 bg-black/40"
+        className="absolute inset-0 bg-black/40 touch-manipulation"
         onClick={onClose}
         aria-label={t('common.closeMenu')}
       />
-      <aside className="relative ml-auto flex h-full w-full max-w-sm flex-col bg-white pb-[env(safe-area-inset-bottom,0px)] pt-[env(safe-area-inset-top,0px)] shadow-2xl">
+      <aside className="relative z-[1] ml-auto flex h-full max-h-[100dvh] w-full max-w-sm flex-col overflow-y-auto bg-white pb-[env(safe-area-inset-bottom,0px)] pt-[env(safe-area-inset-top,0px)] shadow-2xl">
         <div className="flex shrink-0 items-start p-4">
           <button
             type="button"
@@ -319,18 +364,29 @@ function QuizMenuDrawer({ open, onClose }) {
               className="text-sm font-semibold text-orange-600 underline-offset-2 hover:underline"
               onClick={onClose}
             >
-              {otherLang === 'lt' ? t('common.switchToLt') : t('common.switchToEn')}
+              {t(switchToLangLabelKey(nextLang))}
             </Link>
           </div>
+          <button
+            type="button"
+            onClick={handleRestartQuiz}
+            className="text-left text-lg font-semibold text-orange-600 underline-offset-2 transition-colors hover:text-orange-700 hover:underline"
+          >
+            {t('common.restartQuiz')}
+          </button>
           <a
-            href="#terms"
+            href={TERMS_OF_USE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-lg font-medium text-slate-800 transition-colors hover:text-orange-600"
             onClick={onClose}
           >
             {t('common.termsOfUse')}
           </a>
           <a
-            href="#privacy"
+            href={PRIVACY_POLICY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="text-lg font-medium text-slate-800 transition-colors hover:text-orange-600"
             onClick={onClose}
           >
@@ -355,13 +411,14 @@ function QuizMenuDrawer({ open, onClose }) {
           </div>
         </nav>
       </aside>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
 // Bendras mygtuko stilius – pilulės forma, oranžinis, centruotas (kaip reference)
 const QUIZ_BUTTON_BASE =
-  'inline-flex w-full max-w-[min(100%,20rem)] items-center justify-center rounded-full px-6 py-3.5 text-base font-semibold text-white transition-all active:scale-[0.98] sm:w-auto sm:max-w-none sm:px-10 md:px-12';
+  'flex w-full max-w-[min(100%,20rem)] items-center justify-center rounded-full px-6 py-3.5 text-base font-semibold text-white transition-all active:scale-[0.98] sm:mx-auto sm:w-auto sm:max-w-none sm:px-10 md:px-12';
 const CONTINUE_BUTTON_CLASSES =
   QUIZ_BUTTON_BASE +
   ' disabled:cursor-not-allowed disabled:bg-gray-300 disabled:opacity-90 enabled:bg-orange-500 enabled:hover:bg-orange-600';
@@ -417,73 +474,189 @@ function Step52OfferRedirect({ targetWeightKg }) {
  * Step 1: Pradinis langas su fonine nuotrauka, automatinis užkrovimas (10s) → Step 2.
  * Step 2: Baltas fonas, header, klausimas „What is your gender?“ (vyrams – tik jei QUIZ_MALE_BRANCH_ENABLED).
  * Step 3: Dinaminis turinys pagal lytį – moterys/vyrai su nuotrauka ir Continue mygtuku.
+ *
+ * initialLegacyAnswers – iš quizStorage (visi atsakymai), kad perkrovus būtų atkurti laukai (pvz. Step 35).
  */
-function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] } = {}) {
-  const { t } = useTranslation();
+function Quiz({
+  initialStep = 1,
+  initialGender = '',
+  initialSelectedGoals = [],
+  initialLegacyAnswers,
+} = {}) {
+  const { t, i18n } = useTranslation();
   const { t: tLegacy } = useTranslation('legacy');
   const { t: tOffer } = useTranslation('offer');
-  const [step, setStep] = useState(initialStep);
+  const ia = initialLegacyAnswers && typeof initialLegacyAnswers === 'object' ? initialLegacyAnswers : {};
+
+  /** Step 44 pašalintas – senas localStorage vis dar gali turėti 44 → iškart 45 (el. paštas). */
+  const [step, setStep] = useState(() => {
+    const s = typeof initialStep === 'number' ? initialStep : 1;
+    return s === 44 ? 45 : s;
+  });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   /** Step 1: nuo pat pradžios rodomas automatinis užkrovimas (tik jei pradedama nuo 1 žingsnio) */
-  const [isLoading, setIsLoading] = useState(initialStep === 1);
+  const [isLoading, setIsLoading] = useState(() => {
+    const s = typeof initialStep === 'number' ? initialStep : 1;
+    return (s === 44 ? 45 : s) === 1;
+  });
   const [progress, setProgress] = useState(0);
-  const [gender, setGender] = useState(initialGender);
-  const [selectedGoals, setSelectedGoals] = useState(initialSelectedGoals);
-  const [bodyType, setBodyType] = useState('');
-  const [dreamBody, setDreamBody] = useState('');
-  const [selectedFocusAreas, setSelectedFocusAreas] = useState([]);
-  const [celluliteAnswer, setCelluliteAnswer] = useState('');
-  const [bestShapeAnswer, setBestShapeAnswer] = useState('');
-  const [weightFluctuationsAnswer, setWeightFluctuationsAnswer] = useState('');
-  const [stairsAnswer, setStairsAnswer] = useState('');
-  const [workScheduleAnswer, setWorkScheduleAnswer] = useState('');
-  const [activityLevelAnswer, setActivityLevelAnswer] = useState('');
-  const [selectedActivities, setSelectedActivities] = useState([]);
-  const [energyLevelAnswer, setEnergyLevelAnswer] = useState('');
-  const [sleepAnswer, setSleepAnswer] = useState('');
-  const [walkFrequencyAnswer, setWalkFrequencyAnswer] = useState('');
-  const [selectedExercisePreference, setSelectedExercisePreference] = useState([]);
-  const [desiredWalkFrequency, setDesiredWalkFrequency] = useState('');
-  const [dailyStepsAnswer, setDailyStepsAnswer] = useState('');
+  const [gender, setGender] = useState(() => ia.gender ?? initialGender ?? '');
+  useLegacyQuizImagePrefetch(step, gender);
+  const [selectedGoals, setSelectedGoals] = useState(() =>
+    Array.isArray(ia.goals) ? ia.goals : initialSelectedGoals,
+  );
+  const [bodyType, setBodyType] = useState(() => ia.bodyType ?? '');
+  const [dreamBody, setDreamBody] = useState(() => ia.dreamBody ?? '');
+  const [selectedFocusAreas, setSelectedFocusAreas] = useState(() =>
+    Array.isArray(ia.selectedFocusAreas) ? ia.selectedFocusAreas : [],
+  );
+  const [celluliteAnswer, setCelluliteAnswer] = useState(() => ia.celluliteAnswer ?? '');
+  const [bestShapeAnswer, setBestShapeAnswer] = useState(() => ia.bestShapeAnswer ?? '');
+  const [weightFluctuationsAnswer, setWeightFluctuationsAnswer] = useState(
+    () => ia.weightFluctuationsAnswer ?? '',
+  );
+  const [stairsAnswer, setStairsAnswer] = useState(() => ia.stairsAnswer ?? '');
+  const [workScheduleAnswer, setWorkScheduleAnswer] = useState(() => ia.workScheduleAnswer ?? '');
+  const [activityLevelAnswer, setActivityLevelAnswer] = useState(() => ia.activityLevelAnswer ?? '');
+  const [selectedActivities, setSelectedActivities] = useState(() =>
+    Array.isArray(ia.selectedActivities) ? ia.selectedActivities : [],
+  );
+  const [energyLevelAnswer, setEnergyLevelAnswer] = useState(() => ia.energyLevelAnswer ?? '');
+  const [sleepAnswer, setSleepAnswer] = useState(() => ia.sleepAnswer ?? '');
+  const [walkFrequencyAnswer, setWalkFrequencyAnswer] = useState(() => ia.walkFrequencyAnswer ?? '');
+  const [selectedExercisePreference, setSelectedExercisePreference] = useState(() =>
+    Array.isArray(ia.selectedExercisePreference) ? ia.selectedExercisePreference : [],
+  );
+  const [desiredWalkFrequency, setDesiredWalkFrequency] = useState(() => ia.desiredWalkFrequency ?? '');
+  const [dailyStepsAnswer, setDailyStepsAnswer] = useState(() => ia.dailyStepsAnswer ?? '');
   const [testimonialIndex, setTestimonialIndex] = useState(0);
-  const [selectedWeightGainEvents, setSelectedWeightGainEvents] = useState([]);
-  const [motivationAnswer, setMotivationAnswer] = useState('');
-  const [heightValue, setHeightValue] = useState('');
-  const [heightUnit, setHeightUnit] = useState('cm');
-  const [currentWeight, setCurrentWeight] = useState('');
-  const [goalWeight, setGoalWeight] = useState('');
-  const [motivationEventAnswer, setMotivationEventAnswer] = useState('');
-  const [emailForPlan, setEmailForPlan] = useState('');
-  const [rewardAnswer, setRewardAnswer] = useState('');
-  const [seeYourselfAnswer, setSeeYourselfAnswer] = useState('');
-  const [emailOptInAnswer, setEmailOptInAnswer] = useState('');
+  const testimonialSwipeRef = useRef({ x: null, y: null, pointerId: null });
+  const [selectedWeightGainEvents, setSelectedWeightGainEvents] = useState(() =>
+    Array.isArray(ia.selectedWeightGainEvents) ? ia.selectedWeightGainEvents : [],
+  );
+  const [motivationAnswer, setMotivationAnswer] = useState(() => ia.motivationAnswer ?? '');
+  const [heightValue, setHeightValue] = useState(() =>
+    ia.heightValue != null ? String(ia.heightValue) : '',
+  );
+  const [heightUnit, setHeightUnit] = useState(() =>
+    ia.heightUnit === 'ft' || ia.heightUnit === 'cm' ? ia.heightUnit : 'cm',
+  );
+  const [currentWeight, setCurrentWeight] = useState(() =>
+    ia.currentWeight != null ? String(ia.currentWeight) : '',
+  );
+  const [goalWeight, setGoalWeight] = useState(() =>
+    ia.goalWeight != null ? String(ia.goalWeight) : '',
+  );
+  const [motivationEventAnswer, setMotivationEventAnswer] = useState(() => ia.motivationEventAnswer ?? '');
+  const [emailForPlan, setEmailForPlan] = useState(() => ia.emailForPlan ?? '');
+  const [rewardAnswer, setRewardAnswer] = useState(() => ia.rewardAnswer ?? '');
+  const [seeYourselfAnswer, setSeeYourselfAnswer] = useState(() => ia.seeYourselfAnswer ?? '');
+  const [emailOptInAnswer, setEmailOptInAnswer] = useState(() => ia.emailOptInAnswer ?? '');
   /** Vardas – Step 50 po marketing opt-in (Step 46) */
-  const [quizUserName, setQuizUserName] = useState('');
+  const [quizUserName, setQuizUserName] = useState(() => ia.quizUserName ?? '');
   /** Pasitikėjimas pasiekti tikslą – Step 48 po prognozės (Step 37) */
-  const [reachConfidenceAnswer, setReachConfidenceAnswer] = useState('');
+  const [reachConfidenceAnswer, setReachConfidenceAnswer] = useState(() => ia.reachConfidenceAnswer ?? '');
   /** Įvykio data (YYYY-MM-DD) – Step 47 po motyvacijos įvykio */
-  const [motivationEventDate, setMotivationEventDate] = useState('');
+  const [motivationEventDate, setMotivationEventDate] = useState(() => ia.motivationEventDate ?? '');
   /** Tikslus amžius (metais) – po goal weight (Step 34), prieš walking profile (Step 35) */
-  const [exactAgeInput, setExactAgeInput] = useState('');
-  const [userExactAge, setUserExactAge] = useState(null);
+  const [exactAgeInput, setExactAgeInput] = useState(() =>
+    ia.exactAgeInput != null ? String(ia.exactAgeInput) : '',
+  );
+  const [userExactAge, setUserExactAge] = useState(() =>
+    typeof ia.userExactAge === 'number' && !Number.isNaN(ia.userExactAge) ? ia.userExactAge : null,
+  );
   /** Step 43: animuojamas procentas kuriant planą */
   const [planBuildPercent, setPlanBuildPercent] = useState(PLAN_BUILD_START_PERCENT);
+  /** Step 35: KMI žymeklio pozicija juostoje (0–100 %), animuojama atidarius žingsnį */
+  const [profileBmiNeedlePct, setProfileBmiNeedlePct] = useState(0);
 
-  /** Step 9: legacy + offer progresas į localStorage (3 min / 12 h prie offer) */
+  /** Paskutinis „tikras“ apklausos žingsnis prieš peradresavimą į /offer (52 tik techninis). */
+  const LEGACY_STEP_BEFORE_OFFER_REDIRECT = 51;
+
+  /** Step 9: legacy + offer progresas į localStorage (3 min / 12 h prie offer); visi atsakymai – Step 35 atkūrimui */
   useEffect(() => {
+    const persistedStep = step === 52 ? LEGACY_STEP_BEFORE_OFFER_REDIRECT : step;
     writeQuizProgress(
       {
         phase: 'legacy',
         legacyStarted: true,
-        legacyStep: step,
+        legacyStep: persistedStep,
         answers: {
           gender,
           goals: selectedGoals,
+          bodyType,
+          dreamBody,
+          selectedFocusAreas,
+          celluliteAnswer,
+          bestShapeAnswer,
+          weightFluctuationsAnswer,
+          stairsAnswer,
+          workScheduleAnswer,
+          activityLevelAnswer,
+          selectedActivities,
+          energyLevelAnswer,
+          sleepAnswer,
+          walkFrequencyAnswer,
+          selectedExercisePreference,
+          desiredWalkFrequency,
+          dailyStepsAnswer,
+          selectedWeightGainEvents,
+          motivationAnswer,
+          heightValue,
+          heightUnit,
+          currentWeight,
+          goalWeight,
+          motivationEventAnswer,
+          emailForPlan,
+          rewardAnswer,
+          seeYourselfAnswer,
+          emailOptInAnswer,
+          quizUserName,
+          reachConfidenceAnswer,
+          motivationEventDate,
+          exactAgeInput,
+          userExactAge,
         },
       },
       { offerReached: step === 52 },
     );
-  }, [step, gender, selectedGoals]);
+  }, [
+    step,
+    gender,
+    selectedGoals,
+    bodyType,
+    dreamBody,
+    selectedFocusAreas,
+    celluliteAnswer,
+    bestShapeAnswer,
+    weightFluctuationsAnswer,
+    stairsAnswer,
+    workScheduleAnswer,
+    activityLevelAnswer,
+    selectedActivities,
+    energyLevelAnswer,
+    sleepAnswer,
+    walkFrequencyAnswer,
+    selectedExercisePreference,
+    desiredWalkFrequency,
+    dailyStepsAnswer,
+    selectedWeightGainEvents,
+    motivationAnswer,
+    heightValue,
+    heightUnit,
+    currentWeight,
+    goalWeight,
+    motivationEventAnswer,
+    emailForPlan,
+    rewardAnswer,
+    seeYourselfAnswer,
+    emailOptInAnswer,
+    quizUserName,
+    reachConfidenceAnswer,
+    motivationEventDate,
+    exactAgeInput,
+    userExactAge,
+  ]);
 
   const handleGenderSelect = useCallback((selectedGender) => {
     setGender(selectedGender);
@@ -755,10 +928,6 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
     setStep(43);
   }, []);
 
-  const handleCompletionContinue = useCallback(() => {
-    setStep(45);
-  }, []);
-
   const handleTaiChiPlanEmailContinue = useCallback(() => {
     setEmailForPlan((v) => v.trim());
     setStep(46);
@@ -809,7 +978,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
     }
   }, [step]);
 
-  /** Step 43: progresas 0 % → 100 %, tada automatiškai Step 44 */
+  /** Step 43: progresas 0 % → 100 %, tada automatiškai Step 45 (el. paštas) */
   useEffect(() => {
     if (step !== 43) return undefined;
     setPlanBuildPercent(PLAN_BUILD_START_PERCENT);
@@ -825,7 +994,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
       if (t < 1) {
         rafId = requestAnimationFrame(tick);
       } else {
-        timeoutId = window.setTimeout(() => setStep(44), 350);
+        timeoutId = window.setTimeout(() => setStep(45), 350);
       }
     };
     rafId = requestAnimationFrame(tick);
@@ -835,16 +1004,83 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
     };
   }, [step]);
 
+  /** Senas Step 44 (100 % + Tęsti) pašalintas – likę state/URL nukreipiami į Step 45 */
+  useEffect(() => {
+    if (step === 44) setStep(45);
+  }, [step]);
+
+  /** Step 35: KMI žymeklis – nuo 0 % iki tikros pozicijos atidarius profilį */
+  useEffect(() => {
+    if (step !== 35) {
+      setProfileBmiNeedlePct(0);
+      return undefined;
+    }
+    const heightCm =
+      heightUnit === 'cm' ? Number(heightValue) : Number(heightValue) * 2.54;
+    const heightM = heightCm / 100;
+    const bmiVal =
+      currentWeight && heightM > 0 ? Number(currentWeight) / (heightM * heightM) : null;
+    if (bmiVal == null || !Number.isFinite(bmiVal)) {
+      setProfileBmiNeedlePct(0);
+      return undefined;
+    }
+    const pos = Math.min(100, Math.max(0, ((bmiVal - 15) / 25) * 100));
+    setProfileBmiNeedlePct(0);
+    const tid = window.setTimeout(() => {
+      setProfileBmiNeedlePct(pos);
+    }, 100);
+    return () => clearTimeout(tid);
+  }, [step, heightUnit, heightValue, currentWeight]);
+
   /** Step 28: automatinė atsiliepimų karuselė (88 kg → 147 kg) */
   useEffect(() => {
     if (step !== 28) return;
     setTestimonialIndex(0);
     const intervalMs = 5000;
     const id = setInterval(() => {
-      setTestimonialIndex((prev) => (prev + 1) % 2);
+      setTestimonialIndex((prev) => (prev + 1) % TRANSFORMATION_TESTIMONIALS.length);
     }, intervalMs);
     return () => clearInterval(id);
   }, [step]);
+
+  /** Step 28: swipe per atsiliepimus – Pointer Events + setPointerCapture (veikia, kai pirštas nuvedamas už kortelės) */
+  const handleTransformationTestimonialPointerDown = useCallback((e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const el = e.currentTarget;
+    if (el instanceof HTMLElement) {
+      try {
+        el.setPointerCapture(e.pointerId);
+      } catch {
+        /* senesnės naršyklės */
+      }
+    }
+    testimonialSwipeRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      pointerId: e.pointerId,
+    };
+  }, []);
+
+  const handleTransformationTestimonialPointerUp = useCallback((e) => {
+    const start = testimonialSwipeRef.current;
+    if (start.x == null || start.y == null) return;
+    if (start.pointerId != null && e.pointerId !== start.pointerId) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    testimonialSwipeRef.current = { x: null, y: null, pointerId: null };
+    const minSwipe = 40;
+    if (Math.abs(dx) < minSwipe) return;
+    if (Math.abs(dx) < Math.abs(dy)) return;
+    setTestimonialIndex((prev) => {
+      const n = TRANSFORMATION_TESTIMONIALS.length;
+      if (dx < 0) return (prev + 1) % n;
+      return (prev - 1 + n) % n;
+    });
+  }, []);
+
+  const handleTransformationTestimonialPointerCancel = useCallback(() => {
+    testimonialSwipeRef.current = { x: null, y: null, pointerId: null };
+  }, []);
 
   useEffect(() => {
     if (!isLoading) return;
@@ -927,7 +1163,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
   const quizStepProgress = getQuizProgressPercent(step);
 
   const renderQuizStepLayout = (content, options = {}) => {
-    const { backStep, mainClassName, screenClassName } = options;
+    const { backStep, mainClassName, screenClassName, footer } = options;
     const goBack = () => {
       if (backStep !== undefined) {
         setStep(backStep);
@@ -936,17 +1172,22 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
       setStep((prev) => Math.max(1, prev - 1));
     };
     const shellBg = screenClassName ?? 'bg-white';
+    const scrollAreaBase =
+      'relative z-0 flex min-h-0 w-full flex-1 flex-col items-center justify-start overflow-y-auto overflow-x-visible px-6 pt-10 md:pt-14';
+    const scrollPadding = footer
+      ? 'pb-6'
+      : 'pb-[calc(1rem+env(safe-area-inset-bottom,0px))]';
     return (
     <>
-      <div className={`min-h-screen ${shellBg}`}>
+      <div className={`flex h-[100dvh] min-h-0 flex-col overflow-hidden ${shellBg}`}>
         {/* Header: atgal | logo | hamburger – kaip reference (švarus baltas) */}
         <header
-          className={`grid grid-cols-3 items-center border-b border-gray-100 px-4 py-4 ${shellBg}`}
+          className={`relative z-20 grid shrink-0 grid-cols-3 items-center border-b border-gray-100 px-4 py-4 ${shellBg}`}
         >
           <button
             type="button"
             onClick={goBack}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-50"
+            className="flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-50"
             aria-label={t('common.back')}
           >
             <CaretLeft size={24} weight="bold" className="text-gray-500" />
@@ -954,32 +1195,43 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
           <div className="flex justify-center">
             <WalkingIcon showLabel size="md" />
           </div>
-          <button
-            type="button"
-            onClick={() => setIsMenuOpen(true)}
-            className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-gray-600 transition-colors hover:bg-gray-50"
-            aria-label={t('common.menu')}
-          >
-            <List size={24} weight="bold" className="text-gray-600" />
-          </button>
+          {step === 2 ? (
+            <button
+              type="button"
+              onClick={() => setIsMenuOpen(true)}
+              className="flex min-h-[44px] min-w-[44px] touch-manipulation items-center justify-center justify-self-end rounded-full text-gray-600 transition-colors hover:bg-gray-50"
+              aria-label={t('common.menu')}
+            >
+              <List size={24} weight="bold" className="text-gray-600" />
+            </button>
+          ) : (
+            <span className="justify-self-end" aria-hidden />
+          )}
         </header>
 
         {/* Plona progreso juosta – terrakota / oranžinis užpildymas */}
-        <div className="h-0.5 w-full bg-gray-100">
+        <div className="h-0.5 w-full shrink-0 bg-gray-100">
           <div
             className="h-full bg-[#e07a4f] transition-all duration-300 ease-out"
             style={{ width: `${quizStepProgress}%` }}
           />
         </div>
 
-        {/* Turinys – viršutinė trečdalis, centruota horizontaliai (kaip screenshot) */}
-        <main
-          className={`relative z-0 flex min-h-[calc(100vh-100px)] flex-col items-center justify-start overflow-visible px-6 pb-[calc(3rem+env(safe-area-inset-bottom,0px))] pt-10 md:pt-14 ${mainClassName ?? ''}`}
-        >
-          {content}
-        </main>
+        {/* Turinys slankosi viduje; optional footer – „Tęsti“ prisegtas prie apačios (mobilus / desktop) */}
+        {footer ? (
+          <main className="relative z-0 flex min-h-0 w-full flex-1 flex-col overflow-hidden">
+            <div className={`${scrollAreaBase} ${scrollPadding} ${mainClassName ?? ''}`}>{content}</div>
+            <div
+              className={`shrink-0 border-t border-gray-200/90 px-6 pt-4 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] backdrop-blur-[2px] ${shellBg}`}
+            >
+              <div className="mx-auto w-full max-w-md">{footer}</div>
+            </div>
+          </main>
+        ) : (
+          <main className={`${scrollAreaBase} ${scrollPadding} ${mainClassName ?? ''}`}>{content}</main>
+        )}
       </div>
-      <QuizMenuDrawer open={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+      {step === 2 ? <QuizMenuDrawer open={isMenuOpen} onClose={() => setIsMenuOpen(false)} /> : null}
     </>
     );
   };
@@ -1034,9 +1286,9 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
 
     return (
       <>
-      <div className="min-h-screen overflow-x-clip bg-[#f3e9dc]">
-        {/* Header: atgal | logo | hamburger */}
-        <header className="grid grid-cols-3 items-center border-b border-amber-200/50 bg-white/80 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top,0px))] backdrop-blur-sm">
+      <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden overflow-x-clip bg-[#f3e9dc]">
+        {/* Header: atgal | logo */}
+        <header className="grid shrink-0 grid-cols-3 items-center border-b border-amber-200/50 bg-white/80 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top,0px))] backdrop-blur-sm">
           <button
             type="button"
             onClick={() => setStep(2)}
@@ -1048,18 +1300,11 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
           <div className="flex justify-center">
             <WalkingIcon showLabel size="md" />
           </div>
-          <button
-            type="button"
-            className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-            aria-label={t('common.menu')}
-            onClick={() => setIsMenuOpen(true)}
-          >
-            <List size={24} weight="bold" className="text-gray-600" />
-          </button>
+          <span className="justify-self-end" aria-hidden />
         </header>
 
         {/* Progreso juosta */}
-        <div className="h-1 w-full bg-amber-200/50">
+        <div className="h-1 w-full shrink-0 bg-amber-200/50">
           <div
             className="h-full bg-orange-500 transition-all duration-300 ease-out"
             style={{ width: `${getQuizProgressPercent(step)}%` }}
@@ -1067,7 +1312,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
         </div>
 
         {/* Kompaktiškas blokas: kairėje antraštė + ikonos, dešinėje nuotrauka */}
-        <div className="flex min-h-[calc(100vh-120px)] w-full min-w-0 flex-col items-center justify-center overflow-x-clip px-5 py-8 sm:px-8">
+        <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center overflow-y-auto overflow-x-clip px-5 py-6 sm:px-8 sm:py-8">
           <div className="flex w-full max-w-3xl flex-col items-center gap-12 sm:max-w-4xl md:max-w-6xl md:flex-row md:items-center md:justify-center md:gap-20">
             <div className="min-w-0 flex-1 text-center md:max-w-[min(100%,40rem)] md:text-left">
               <div className="flex flex-wrap items-center justify-center gap-3 md:justify-start md:gap-4">
@@ -1110,8 +1355,8 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
           </div>
         </div>
 
-        {/* Continue mygtukas – apačioje, visada matomas */}
-        <div className="relative z-10 flex justify-center px-6 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] pt-4">
+        {/* Continue mygtukas – fiksuota juosta apačioje (mobilus) */}
+        <div className="relative z-10 flex shrink-0 justify-center border-t border-amber-200/50 bg-[#f3e9dc]/95 px-6 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] backdrop-blur-sm">
           <button
             type="button"
             onClick={handleContinue}
@@ -1120,7 +1365,6 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
         </button>
         </div>
       </div>
-      <QuizMenuDrawer open={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
       </>
     );
   }
@@ -1137,9 +1381,9 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
 
     return (
       <>
-      <div className="min-h-screen overflow-x-clip bg-white">
+      <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden overflow-x-clip bg-white">
         {/* Header */}
-        <header className="grid grid-cols-3 items-center border-b border-gray-200 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top,0px))]">
+        <header className="grid shrink-0 grid-cols-3 items-center border-b border-gray-200 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top,0px))]">
           <button
             type="button"
             onClick={() => setStep(3)}
@@ -1151,18 +1395,11 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
           <div className="flex justify-center">
             <WalkingIcon showLabel size="md" />
           </div>
-          <button
-            type="button"
-            className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-            aria-label={t('common.menu')}
-            onClick={() => setIsMenuOpen(true)}
-          >
-            <List size={24} weight="bold" className="text-gray-600" />
-          </button>
+          <span className="justify-self-end" aria-hidden />
         </header>
 
         {/* Progreso juosta */}
-        <div className="h-1 w-full bg-gray-200">
+        <div className="h-1 w-full shrink-0 bg-gray-200">
           <div
             className="h-full bg-orange-500 transition-all duration-300"
             style={{ width: `${getQuizProgressPercent(step)}%` }}
@@ -1170,7 +1407,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
         </div>
 
         {/* Turinys */}
-        <main className="flex flex-col items-center px-6 py-8">
+        <main className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-8 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
           <h2 className="text-center text-lg font-bold uppercase tracking-wide text-gray-900">
             {t('quiz.age.heading')}
           </h2>
@@ -1214,7 +1451,6 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
           </button>
         </main>
       </div>
-      <QuizMenuDrawer open={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
       </>
     );
   }
@@ -1252,31 +1488,34 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
           }}
           className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-4 text-center text-2xl font-semibold tracking-wide text-gray-900 outline-none transition-colors placeholder:text-gray-300 focus:border-orange-400 focus:ring-2 focus:ring-orange-200"
         />
-
-        <div className="flex justify-center pt-2">
-          <button
-            type="button"
-            onClick={handleExactAgeContinue}
-            disabled={!exactAgeValid}
-            className={CONTINUE_BUTTON_CLASSES}
-          >{t('quiz.common.continue')}
-        </button>
-        </div>
       </div>,
-      { backStep: 34 },
+      {
+        backStep: 34,
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleExactAgeContinue}
+              disabled={!exactAgeValid}
+              className={CONTINUE_BUTTON_CLASSES}
+            >{t('quiz.common.continue')}
+          </button>
+          </div>
+        ),
+      },
     );
   }
 
   // Step 5: Tikslų pasirinkimas (multi-select)
   if (step === 5) {
-    const GOAL_OPTIONS = [
-      { id: 'lose_weight', label: 'Lose weight' },
-      { id: 'heart_health', label: 'Improve heart health' },
-      { id: 'flexibility', label: 'Develop flexibility' },
-      { id: 'self_esteem', label: 'Improve self-esteem and love my body' },
-      { id: 'stay_fit', label: 'Stay fit' },
-      { id: 'reduce_stress', label: 'Reduce stress' },
-      { id: 'firm_toned', label: 'Get firm and toned' },
+    const GOAL_IDS = [
+      'lose_weight',
+      'heart_health',
+      'flexibility',
+      'self_esteem',
+      'stay_fit',
+      'reduce_stress',
+      'firm_toned',
     ];
 
     const hasSelectedGoals = selectedGoals.length > 0;
@@ -1288,29 +1527,29 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <div className="flex items-center justify-center gap-2">
               <HelpCircle size={28} className={QUIZ_ICON_CLASS} />
               <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-                What do you want to achieve?
+                {t('quiz.goals.title')}
               </h2>
             </div>
             <p className="text-sm text-gray-500">
-              Select as many goals as you want
+              {t('quiz.goals.hint')}
             </p>
           </div>
 
           <div className="flex flex-col gap-3">
-            {GOAL_OPTIONS.map((option) => {
-              const isSelected = selectedGoals.includes(option.id);
+            {GOAL_IDS.map((id) => {
+              const isSelected = selectedGoals.includes(id);
               return (
                 <button
-                  key={option.id}
+                  key={id}
                   type="button"
-                  onClick={() => handleGoalToggle(option.id)}
+                  onClick={() => handleGoalToggle(id)}
                   className={`flex cursor-pointer items-center justify-between gap-4 rounded-xl px-4 py-4 text-left shadow-sm ${
                     isSelected
                       ? QUIZ_OPTION_CARD_SELECTED
                       : `${QUIZ_OPTION_CARD_IDLE} ${QUIZ_OPTION_INTERACTIVE}`
                   }`}
                 >
-                  <span className="font-medium text-gray-900">{option.label}</span>
+                  <span className="font-medium text-gray-900">{t(`quiz.goals.${id}`)}</span>
                   <span
                     className={`flex h-6 w-6 shrink-0 items-center justify-center rounded border-2 transition-colors ${
                       isSelected
@@ -1332,34 +1571,31 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
         {!hasSelectedGoals && (
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
             <LucideXCircle size={20} className="text-blue-500 shrink-0" />
-            <span className="text-sm font-medium">{tLegacy('validation.selectGoal')}</span>
+            <span className="text-sm font-medium">{t('quiz.goals.validation')}</span>
           </div>
         )}
-
-        {/* Continue mygtukas apačioje */}
-        <div className="mt-8 flex justify-center border-t border-gray-200 pt-6">
-          <button
-            type="button"
-            onClick={handleGoalsContinue}
-            disabled={!hasSelectedGoals}
-            className={CONTINUE_BUTTON_CLASSES}
-          >{t('quiz.common.continue')}
-        </button>
-        </div>
       </div>,
-      { backStep: 4 },
+      {
+        backStep: 4,
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleGoalsContinue}
+              disabled={!hasSelectedGoals}
+              className={CONTINUE_BUTTON_CLASSES}
+            >{t('quiz.common.continue')}
+          </button>
+          </div>
+        ),
+      },
     );
   }
 
   // Step 6: Kūno tipo pasirinkimas (moterų / vyrų nuotraukos pagal gender)
   if (step === 6) {
     const bodyTypeImages = gender === 'male' ? MALE_BODY_TYPE_IMAGES : BODY_TYPE_IMAGES;
-    const BODY_TYPE_OPTIONS = [
-      { id: 'slim', label: 'Slim' },
-      { id: 'mid_sized', label: 'Mid-sized' },
-      { id: 'plus_sized', label: 'Plus-sized' },
-      { id: 'overweight', label: 'Overweight' },
-    ];
+    const BODY_TYPE_IDS = ['slim', 'mid_sized', 'plus_sized', 'overweight'];
 
     const hasSelectedBodyType = bodyType !== '';
 
@@ -1370,19 +1606,20 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <div className="flex items-center justify-center gap-2">
               <HelpCircle size={28} className={QUIZ_ICON_CLASS} />
               <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-                What image describes your physical build?
+                {t('quiz.flow.bodyType.title')}
               </h2>
             </div>
           </div>
 
           <div className="flex flex-col gap-3">
-            {BODY_TYPE_OPTIONS.map((option) => {
-              const isSelected = bodyType === option.id;
+            {BODY_TYPE_IDS.map((id) => {
+              const isSelected = bodyType === id;
+              const label = t(`quiz.flow.bodyType.${id}`);
               return (
                 <button
-                  key={option.id}
+                  key={id}
                   type="button"
-                  onClick={() => handleBodyTypeSelect(option.id)}
+                  onClick={() => handleBodyTypeSelect(id)}
                   className={`flex cursor-pointer items-center gap-4 rounded-xl px-4 py-3 text-left shadow-sm ${
                     isSelected
                       ? QUIZ_OPTION_CARD_SELECTED
@@ -1391,12 +1628,12 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                 >
                   <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-gray-100">
                     <img
-                      src={bodyTypeImages[option.id]}
-                      alt={option.label}
+                      src={bodyTypeImages[id]}
+                      alt={label}
                       className="h-full w-full object-cover"
                     />
                   </div>
-                  <span className="flex-1 font-medium text-gray-900">{option.label}</span>
+                  <span className="flex-1 font-medium text-gray-900">{label}</span>
                   {isSelected && <CheckCircle size={24} className={QUIZ_OPTION_CHECK_ICON} />}
                 </button>
               );
@@ -1410,38 +1647,34 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <span className="text-sm font-medium">{tLegacy('validation.selectBodyType')}</span>
           </div>
         )}
-
-        {/* Continue mygtukas apačioje */}
-        <div className="mt-8 flex justify-center border-t border-gray-200 pt-6">
-          <button
-            type="button"
-            onClick={handleBodyTypeContinue}
-            disabled={!hasSelectedBodyType}
-            className={CONTINUE_BUTTON_CLASSES}
-          >{t('quiz.common.continue')}
-        </button>
-        </div>
-      </div>
+      </div>,
+      {
+        backStep: 5,
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleBodyTypeContinue}
+              disabled={!hasSelectedBodyType}
+              className={CONTINUE_BUTTON_CLASSES}
+            >{t('quiz.common.continue')}
+          </button>
+          </div>
+        ),
+      },
     );
   }
 
   // Step 7: Dream body pasirinkimas (vyrams – atskiros nuotraukos, „Shapely“ vietoj „Curvy“)
   if (step === 7) {
     const dreamBodyImages = gender === 'male' ? MALE_DREAM_BODY_IMAGES : DREAM_BODY_IMAGES;
-    const DREAM_BODY_OPTIONS =
-      gender === 'male'
-        ? [
-            { id: 'thin', label: 'Thin' },
-            { id: 'toned', label: 'Toned' },
-            { id: 'curvy', label: 'Shapely' },
-            { id: 'healthy', label: 'Healthy' },
-          ]
-        : [
-            { id: 'thin', label: 'Thin' },
-            { id: 'toned', label: 'Toned' },
-            { id: 'curvy', label: 'Curvy' },
-            { id: 'healthy', label: 'Healthy' },
-          ];
+    const DREAM_BODY_IDS = ['thin', 'toned', 'curvy', 'healthy'];
+    const dreamLabelFor = (id) =>
+      id === 'curvy'
+        ? gender === 'male'
+          ? t('quiz.flow.dreamBody.curvyMale')
+          : t('quiz.flow.dreamBody.curvyFemale')
+        : t(`quiz.flow.dreamBody.${id}`);
 
     const hasSelectedDreamBody = dreamBody !== '';
 
@@ -1452,19 +1685,20 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <div className="flex items-center justify-center gap-2">
               <HelpCircle size={28} className={QUIZ_ICON_CLASS} />
               <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-                What is your dream body?
+                {t('quiz.flow.dreamBody.title')}
               </h2>
             </div>
           </div>
 
           <div className="flex flex-col gap-3">
-            {DREAM_BODY_OPTIONS.map((option) => {
-              const isSelected = dreamBody === option.id;
+            {DREAM_BODY_IDS.map((id) => {
+              const isSelected = dreamBody === id;
+              const label = dreamLabelFor(id);
               return (
                 <button
-                  key={option.id}
+                  key={id}
                   type="button"
-                  onClick={() => handleDreamBodySelect(option.id)}
+                  onClick={() => handleDreamBodySelect(id)}
                   className={`flex cursor-pointer items-center gap-4 rounded-xl px-4 py-3 text-left shadow-sm ${
                     isSelected
                       ? QUIZ_OPTION_CARD_SELECTED
@@ -1473,12 +1707,12 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                 >
                   <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-gray-100">
                     <img
-                      src={dreamBodyImages[option.id]}
-                      alt={option.label}
+                      src={dreamBodyImages[id]}
+                      alt={label}
                       className="h-full w-full object-cover"
                     />
                   </div>
-                  <span className="flex-1 font-medium text-gray-900">{option.label}</span>
+                  <span className="flex-1 font-medium text-gray-900">{label}</span>
                   {isSelected && <CheckCircle size={24} className={QUIZ_OPTION_CHECK_ICON} />}
                 </button>
               );
@@ -1492,32 +1726,28 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <span className="text-sm font-medium">{tLegacy('validation.selectDreamBody')}</span>
           </div>
         )}
-
-        <div className="mt-8 flex justify-center border-t border-gray-200 pt-6">
-          <button
-            type="button"
-            onClick={handleDreamBodyContinue}
-            disabled={!hasSelectedDreamBody}
-            className={CONTINUE_BUTTON_CLASSES}
-          >{t('quiz.common.continue')}
-        </button>
-        </div>
-      </div>
+      </div>,
+      {
+        backStep: 6,
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleDreamBodyContinue}
+              disabled={!hasSelectedDreamBody}
+              className={CONTINUE_BUTTON_CLASSES}
+            >{t('quiz.common.continue')}
+          </button>
+          </div>
+        ),
+      },
     );
   }
 
   // Step 8: Kurių sričių norite sutelkti dėmesį (vyrams – atskiros nuotraukos; „Full body“ = visi)
   if (step === 8) {
     const focusAreaImages = gender === 'male' ? MALE_FOCUS_AREA_IMAGES : FOCUS_AREA_IMAGES;
-    const FOCUS_AREA_OPTIONS = [
-      { id: 'legs', label: 'Legs' },
-      { id: 'belly', label: 'Belly' },
-      { id: 'arms', label: 'Arms' },
-      { id: 'chest', label: 'Chest' },
-      { id: 'buttocks', label: 'Buttocks' },
-      { id: 'hips', label: 'Hips' },
-      { id: 'full_body', label: 'Full body' },
-    ];
+    const FOCUS_AREA_IDS = ['legs', 'belly', 'arms', 'chest', 'buttocks', 'hips', 'full_body'];
 
     const hasSelectedAreas = selectedFocusAreas.length > 0;
 
@@ -1528,22 +1758,23 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <div className="flex items-center justify-center gap-2">
               <HelpCircle size={28} className={QUIZ_ICON_CLASS} />
               <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-                Which areas do you want to focus on?
+                {t('quiz.flow.focus.title')}
               </h2>
             </div>
             <p className="text-sm text-gray-500">
-              Your walking plan will be focused on these areas
+              {t('quiz.flow.focus.subtitle')}
             </p>
           </div>
 
           <div className="flex flex-col gap-3">
-            {FOCUS_AREA_OPTIONS.map((option) => {
-              const isSelected = selectedFocusAreas.includes(option.id);
+            {FOCUS_AREA_IDS.map((id) => {
+              const isSelected = selectedFocusAreas.includes(id);
+              const label = t(`quiz.flow.focus.${id}`);
               return (
                 <button
-                  key={option.id}
+                  key={id}
                   type="button"
-                  onClick={() => handleFocusAreaToggle(option.id)}
+                  onClick={() => handleFocusAreaToggle(id)}
                   className={`flex cursor-pointer items-center justify-between gap-4 rounded-xl px-4 py-4 text-left shadow-sm ${
                     isSelected
                       ? QUIZ_OPTION_CARD_SELECTED
@@ -1553,12 +1784,12 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                   <div className="flex items-center gap-4">
                     <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-gray-100">
                       <img
-                        src={focusAreaImages[option.id]}
-                        alt={option.label}
+                        src={focusAreaImages[id]}
+                        alt={label}
                         className="h-full w-full object-cover"
                       />
                     </div>
-                    <span className="font-medium text-gray-900">{option.label}</span>
+                    <span className="font-medium text-gray-900">{label}</span>
                   </div>
                   <span
                     className={`flex h-6 w-6 shrink-0 items-center justify-center rounded border-2 transition-colors ${
@@ -1583,26 +1814,30 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <span className="text-sm font-medium">{tLegacy('validation.selectArea')}</span>
           </div>
         )}
-
-        <div className="mt-8 flex justify-center border-t border-gray-200 pt-6">
-          <button
-            type="button"
-            onClick={handleFocusAreasContinue}
-            disabled={!hasSelectedAreas}
-            className={CONTINUE_BUTTON_CLASSES}
-          >{t('quiz.common.continue')}
-        </button>
-        </div>
-      </div>
+      </div>,
+      {
+        backStep: 7,
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleFocusAreasContinue}
+              disabled={!hasSelectedAreas}
+              className={CONTINUE_BUTTON_CLASSES}
+            >{t('quiz.common.continue')}
+          </button>
+          </div>
+        ),
+      },
     );
   }
 
   // Step 9: Do you struggle with cellulite?
   if (step === 9) {
     const CELLULITE_OPTIONS = [
-      { id: 'yes', label: 'Yes', icon: 'check' },
-      { id: 'no', label: 'No', icon: 'x' },
-      { id: 'a_little', label: 'A little bit', icon: 'ellipsis' },
+      { id: 'yes', icon: 'check' },
+      { id: 'no', icon: 'x' },
+      { id: 'a_little', icon: 'ellipsis' },
     ];
 
     const hasSelected = celluliteAnswer !== '';
@@ -1625,7 +1860,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <div className="flex items-center justify-center gap-2">
               <HelpCircle size={28} className={QUIZ_ICON_CLASS} />
               <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-                Do you struggle with cellulite?
+                {t('quiz.flow.cellulite.title')}
               </h2>
             </div>
           </div>
@@ -1651,7 +1886,9 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                   >
                     {renderIcon(option.icon, isSelected)}
                   </span>
-                  <span className="flex-1 font-medium text-gray-900">{option.label}</span>
+                  <span className="flex-1 font-medium text-gray-900">
+                    {t(`quiz.flow.cellulite.${option.id}`)}
+                  </span>
                   {isSelected && <CheckCircle size={24} className={QUIZ_OPTION_CHECK_ICON} />}
                 </button>
               );
@@ -1665,17 +1902,21 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <span className="text-sm font-medium">{tLegacy('validation.selectOption')}</span>
           </div>
         )}
-
-        <div className="mt-8 flex justify-center border-t border-gray-200 pt-6">
-          <button
-            type="button"
-            onClick={handleCelluliteContinue}
-            disabled={!hasSelected}
-            className={CONTINUE_BUTTON_CLASSES}
-          >{t('quiz.common.continue')}
-        </button>
-        </div>
-      </div>
+      </div>,
+      {
+        backStep: 8,
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleCelluliteContinue}
+              disabled={!hasSelected}
+              className={CONTINUE_BUTTON_CLASSES}
+            >{t('quiz.common.continue')}
+          </button>
+          </div>
+        ),
+      },
     );
   }
 
@@ -1683,20 +1924,15 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
   if (step === 10) {
     const bestShapeSideHero =
       gender === 'male' ? menPritupstaiHeroImage : bestShapeHeroImage;
-    const BEST_SHAPE_OPTIONS = [
-      { id: 'less_than_year', label: 'Less than a year ago' },
-      { id: '1_to_2_years', label: '1 to 2 years ago' },
-      { id: 'more_than_3', label: 'More than 3 years ago' },
-      { id: 'never', label: 'Never' },
-    ];
+    const BEST_SHAPE_IDS = ['less_than_year', '1_to_2_years', 'more_than_3', 'never'];
 
     const hasSelected = bestShapeAnswer !== '';
 
     return renderQuizStepLayout(
       <div className="relative w-full max-w-2xl pb-8 md:pb-12">
-        {/* Viso ekrano plotis – nuotrauka išlygiuota prie dešinio krašto, matomas visas siluetas */}
+        {/* md+: šoninis herojus; mobilus – tas pats vaizdas sraute žemiau */}
         <div
-          className="pointer-events-none absolute bottom-0 left-1/2 z-0 flex w-screen max-w-[100vw] -translate-x-1/2 justify-end pr-3 sm:pr-4 md:pr-6"
+          className="pointer-events-none absolute bottom-0 left-1/2 z-0 hidden w-screen max-w-[100vw] -translate-x-1/2 justify-end pr-3 sm:pr-4 md:flex md:pr-6"
           aria-hidden
         >
           <img
@@ -1706,26 +1942,26 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
           />
         </div>
 
-        <div className="relative z-10 mx-auto flex w-full max-w-md flex-col pb-24 sm:pb-32 md:pb-28">
+        <div className="relative z-10 mx-auto flex w-full max-w-md flex-col pb-2 md:pb-28">
           <h2 className="text-center text-2xl font-bold leading-snug text-gray-900 md:text-3xl">
-            How long ago were you in the best shape of your life?
+            {t('quiz.flow.bestShape.title')}
           </h2>
 
           <div className="mt-8 flex w-full flex-col gap-3 sm:mt-10">
-            {BEST_SHAPE_OPTIONS.map((option) => {
-              const isSelected = bestShapeAnswer === option.id;
+            {BEST_SHAPE_IDS.map((id) => {
+              const isSelected = bestShapeAnswer === id;
               return (
                 <button
-                  key={option.id}
+                  key={id}
                   type="button"
-                  onClick={() => handleBestShapeSelect(option.id)}
+                  onClick={() => handleBestShapeSelect(id)}
                   className={`flex w-full cursor-pointer items-center justify-between gap-4 rounded-xl px-4 py-3.5 text-left shadow-sm ${
                     isSelected
                       ? QUIZ_OPTION_CARD_SELECTED
                       : `${QUIZ_OPTION_CARD_IDLE} ${QUIZ_OPTION_INTERACTIVE}`
                   }`}
                 >
-                  <span className="font-medium text-gray-900">{option.label}</span>
+                  <span className="font-medium text-gray-900">{t(`quiz.flow.bestShape.${id}`)}</span>
                   {isSelected && <CheckCircle size={24} className={QUIZ_OPTION_CHECK_ICON} />}
                 </button>
               );
@@ -1739,7 +1975,19 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             </div>
           )}
 
-          <div className="mt-8 flex justify-center border-t border-gray-200 pt-6">
+          <div className="flex w-full justify-center px-1 pt-3 md:hidden" aria-hidden>
+            <img
+              src={bestShapeSideHero}
+              alt=""
+              className="h-auto max-h-[min(40vh,260px)] w-auto max-w-[min(100%,20rem)] object-contain object-bottom"
+            />
+          </div>
+        </div>
+      </div>,
+      {
+        backStep: 9,
+        footer: (
+          <div className="flex justify-center">
             <button
               type="button"
               onClick={handleBestShapeContinue}
@@ -1748,8 +1996,8 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             >{t('quiz.common.continue')}
           </button>
           </div>
-        </div>
-      </div>
+        ),
+      },
     );
   }
 
@@ -1757,11 +2005,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
   if (step === 11) {
     const weightFluctuationsSideHero =
       gender === 'male' ? menStabilityBallHeroImage : weightFluctuationsHeroImage;
-    const WEIGHT_FLUCTUATIONS_OPTIONS = [
-      { id: 'gain_fast_lose_slow', label: 'I gain weight fast but lose it slowly' },
-      { id: 'gain_lose_easily', label: 'I gain and lose weight easily' },
-      { id: 'struggle_to_gain', label: 'I struggle to gain weight or muscle' },
-    ];
+    const WEIGHT_FLUCT_IDS = ['gain_fast_lose_slow', 'gain_lose_easily', 'struggle_to_gain'];
 
     const hasSelected = weightFluctuationsAnswer !== '';
     const isMaleWeightFluctuations = gender === 'male';
@@ -1769,7 +2013,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
     return renderQuizStepLayout(
       <div className="relative w-full max-w-2xl pb-8 md:pb-12">
         <div
-          className={`pointer-events-none absolute bottom-0 left-1/2 z-0 flex w-screen max-w-[100vw] -translate-x-1/2 justify-end ${
+          className={`pointer-events-none absolute bottom-0 left-1/2 z-0 hidden w-screen max-w-[100vw] -translate-x-1/2 justify-end md:flex ${
             isMaleWeightFluctuations
               ? 'top-[max(5.5rem,20vh)] items-end pr-1 sm:pr-2 md:pr-4'
               : 'items-start pr-3 sm:pr-4 md:pr-6'
@@ -1787,26 +2031,26 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
           />
         </div>
 
-        <div className="relative z-10 mx-auto flex w-full max-w-md flex-col pb-24 sm:pb-32 md:pb-28">
+        <div className="relative z-10 mx-auto flex w-full max-w-md flex-col pb-2 md:pb-28">
           <h2 className="text-center text-2xl font-bold leading-snug text-gray-900 md:text-3xl">
-            How would you describe your weight fluctuations?
+            {t('quiz.flow.weightFluct.title')}
           </h2>
 
           <div className="mt-8 flex w-full flex-col gap-3 sm:mt-10">
-            {WEIGHT_FLUCTUATIONS_OPTIONS.map((option) => {
-              const isSelected = weightFluctuationsAnswer === option.id;
+            {WEIGHT_FLUCT_IDS.map((id) => {
+              const isSelected = weightFluctuationsAnswer === id;
               return (
                 <button
-                  key={option.id}
+                  key={id}
                   type="button"
-                  onClick={() => handleWeightFluctuationsSelect(option.id)}
+                  onClick={() => handleWeightFluctuationsSelect(id)}
                   className={`flex w-full cursor-pointer items-center justify-between gap-4 rounded-xl px-4 py-3.5 text-left shadow-sm ${
                     isSelected
                       ? QUIZ_OPTION_CARD_SELECTED
                       : `${QUIZ_OPTION_CARD_IDLE} ${QUIZ_OPTION_INTERACTIVE}`
                   }`}
                 >
-                  <span className="font-medium text-gray-900">{option.label}</span>
+                  <span className="font-medium text-gray-900">{t(`quiz.flow.weightFluct.${id}`)}</span>
                   {isSelected && <CheckCircle size={24} className={QUIZ_OPTION_CHECK_ICON} />}
                 </button>
               );
@@ -1820,7 +2064,23 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             </div>
           )}
 
-          <div className="mt-8 flex justify-center border-t border-gray-200 pt-6">
+          <div className="flex w-full justify-center px-1 pt-3 md:hidden" aria-hidden>
+            <img
+              src={weightFluctuationsSideHero}
+              alt=""
+              className={
+                isMaleWeightFluctuations
+                  ? 'h-auto max-h-[min(42vh,280px)] w-auto max-w-[min(100%,18rem)] translate-x-0.5 object-contain object-bottom'
+                  : 'h-auto max-h-[min(40vh,260px)] w-auto max-w-[min(100%,20rem)] object-contain object-bottom'
+              }
+            />
+          </div>
+        </div>
+      </div>,
+      {
+        backStep: 10,
+        footer: (
+          <div className="flex justify-center">
             <button
               type="button"
               onClick={handleWeightFluctuationsContinue}
@@ -1829,8 +2089,8 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             >{t('quiz.common.continue')}
           </button>
           </div>
-        </div>
-      </div>
+        ),
+      },
     );
   }
 
@@ -1838,14 +2098,16 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
   if (step === 12) {
     const isMaleHarvardInfo = gender === 'male';
     const shellBg = isMaleHarvardInfo
-      ? 'min-h-screen bg-gradient-to-b from-white via-[#fdf8f2] to-[#f5e6d4]'
-      : 'min-h-screen bg-[#fdf5e6]';
+      ? 'bg-gradient-to-b from-white via-[#fdf8f2] to-[#f5e6d4]'
+      : 'bg-[#fdf5e6]';
+
+    const footerBg = isMaleHarvardInfo ? 'bg-[#f5e6d4]/95' : 'bg-[#fdf5e6]/95';
 
     return (
       <>
-      <div className={`${shellBg} overflow-x-clip`}>
+      <div className={`flex h-[100dvh] min-h-0 flex-col overflow-hidden overflow-x-clip ${shellBg}`}>
         {/* Header */}
-        <header className="grid grid-cols-3 items-center border-b border-amber-200/50 bg-white/80 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top,0px))] backdrop-blur-sm">
+        <header className="grid shrink-0 grid-cols-3 items-center border-b border-amber-200/50 bg-white/80 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top,0px))] backdrop-blur-sm">
           <button
             type="button"
             onClick={() => setStep(11)}
@@ -1857,29 +2119,22 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
           <div className="flex justify-center">
             <WalkingIcon showLabel size="md" />
           </div>
-          <button
-            type="button"
-            className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-            aria-label={t('common.menu')}
-            onClick={() => setIsMenuOpen(true)}
-          >
-            <List size={24} weight="bold" className="text-gray-600" />
-          </button>
+          <span className="justify-self-end" aria-hidden />
         </header>
 
         {/* Progreso juosta */}
-        <div className="h-1 w-full bg-amber-200/50">
+        <div className="h-1 w-full shrink-0 bg-amber-200/50">
           <div
             className="h-full bg-orange-500 transition-all duration-300"
             style={{ width: `${getQuizProgressPercent(step)}%` }}
           />
         </div>
 
-        {/* Turinys */}
-        <div className="relative min-h-[calc(100vh-120px)] overflow-x-clip overflow-y-visible px-6 py-8 pb-32 sm:pb-40">
+        {/* Turinys: slankoma sritis – md+ šoninis herojus; mobilus – gydytojas sraute po citata */}
+        <div className="relative min-h-0 flex-1 overflow-y-auto overflow-x-clip px-6 py-5">
           {isMaleHarvardInfo ? (
             <div
-              className="pointer-events-none absolute bottom-0 right-0 z-0 flex justify-end overflow-visible"
+              className="pointer-events-none absolute bottom-0 right-0 z-0 hidden justify-end overflow-visible md:flex"
               aria-hidden
             >
               <img
@@ -1890,7 +2145,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             </div>
           ) : (
             <div
-              className="pointer-events-none absolute bottom-0 left-1/2 z-0 flex w-screen max-w-[100vw] -translate-x-1/2 justify-end pr-2 sm:pr-4 md:pr-6"
+              className="pointer-events-none absolute bottom-0 left-1/2 z-0 hidden w-screen max-w-[100vw] -translate-x-1/2 justify-end pr-2 sm:pr-4 md:flex md:pr-6"
               aria-hidden
             >
               <img
@@ -1901,12 +2156,12 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             </div>
           )}
 
-          <div className="relative z-10 flex max-w-xl flex-col">
+          <div className="relative z-10 mx-auto flex w-full max-w-xl flex-col">
             {/* Harvard Gazette logotipas */}
             <div className="mb-4">
               <img
                 src={harvardGazetteLogo}
-                alt="The Harvard Gazette"
+                alt={t('quiz.flow.harvard.gazetteAlt')}
                 className="h-7 w-auto max-w-[200px] sm:h-8"
               />
             </div>
@@ -1914,19 +2169,21 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             {/* Antraštė */}
             {isMaleHarvardInfo ? (
               <h2 className="mb-6 text-2xl font-bold leading-tight text-gray-900 md:text-3xl lg:text-4xl">
-                Weight Loss &amp; Health{' '}
-                <span className="text-orange-500">Benefits</span>
-                {' '}of Tai Chi Walking{' '}
-                <span className="text-orange-500">for Men over 50</span>
+                {t('quiz.flow.harvard.maleTitleBefore')}{' '}
+                <span className="text-orange-500">{t('quiz.flow.harvard.maleBenefits')}</span>
+                {' '}
+                {t('quiz.flow.harvard.maleTitleMid')}{' '}
+                <span className="text-orange-500">{t('quiz.flow.harvard.maleAge')}</span>
               </h2>
             ) : (
               <div className="mb-6 flex items-start gap-2">
                 <HelpCircle size={28} className={`${QUIZ_ICON_CLASS} mt-1`} />
                 <h2 className="text-2xl font-bold leading-tight text-gray-900 md:text-3xl">
-                  Weight Loss and Health{' '}
-                  <span className="text-orange-500">Benefits</span>
-                  {' '}of Tai Chi Walking{' '}
-                  <span className="text-orange-500">for Women over 50</span>
+                  {t('quiz.flow.harvard.femaleHelp')}{' '}
+                  <span className="text-orange-500">{t('quiz.flow.harvard.femaleBenefits')}</span>
+                  {' '}
+                  {t('quiz.flow.harvard.femaleTitleMid')}{' '}
+                  <span className="text-orange-500">{t('quiz.flow.harvard.femaleAge')}</span>
                 </h2>
               </div>
             )}
@@ -1935,16 +2192,33 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-md">
               <span className="text-3xl font-serif text-orange-500">&ldquo;</span>
               <p className="mt-2 text-gray-700">
-                A study in the Journal of Aging and Physical Activity found that Tai Chi walking led to a{' '}
-                <strong>20%</strong> boost in heart health and helped{' '}
-                <strong>lose 6-8% of body weight</strong> within 4-12 weeks.
+                {t('quiz.flow.harvard.quotePart1')}{' '}
+                <strong>{t('quiz.flow.harvard.quoteBold1')}</strong>{' '}
+                {t('quiz.flow.harvard.quotePart2')}{' '}
+                <strong>{t('quiz.flow.harvard.quoteBold2')}</strong>{' '}
+                {t('quiz.flow.harvard.quotePart3')}
               </p>
+            </div>
+
+            {/* Mobilus: gydytojas po citata – matomas kartu slankant; nebespaudžia turinio į ekrano dugną */}
+            <div className="mt-5 flex w-full justify-center pb-2 md:hidden" aria-hidden>
+              <img
+                src={isMaleHarvardInfo ? harvardInfoMaleDoctorImage : harvardInfoDoctorImage}
+                alt=""
+                className={
+                  isMaleHarvardInfo
+                    ? 'h-auto max-h-[min(38vh,260px)] w-auto max-w-[min(100%,18rem)] object-contain object-bottom'
+                    : 'h-auto max-h-[min(36vh,240px)] w-auto max-w-[min(100%,20rem)] object-contain object-bottom'
+                }
+              />
             </div>
           </div>
         </div>
 
-        {/* Continue mygtukas */}
-        <div className="relative z-10 flex justify-center px-6 pb-8 pt-4">
+        {/* Continue – fiksuota juosta apačioje */}
+        <div
+          className={`relative z-20 flex shrink-0 justify-center border-t border-amber-200/50 px-6 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] backdrop-blur-sm ${footerBg}`}
+        >
           <button
             type="button"
             onClick={handleHarvardInfoContinue}
@@ -1953,7 +2227,6 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
         </button>
         </div>
       </div>
-      <QuizMenuDrawer open={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
       </>
     );
   }
@@ -1962,11 +2235,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
   if (step === 13) {
     const stairsOptionImages =
       gender === 'male' ? MALE_STAIRS_OPTION_IMAGES : STAIRS_OPTION_IMAGES;
-    const STAIRS_OPTIONS = [
-      { id: 'out_of_breath', label: 'Out of breath' },
-      { id: 'sometimes_tired', label: 'Sometimes tired but this OK' },
-      { id: 'easily', label: 'Easily' },
-    ];
+    const STAIRS_IDS = ['out_of_breath', 'sometimes_tired', 'easily'];
 
     const hasSelected = stairsAnswer !== '';
 
@@ -1977,22 +2246,22 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <div className="flex items-center justify-center gap-2">
               <HelpCircle size={28} className={QUIZ_ICON_CLASS} />
               <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-                How do you feel after climbing some stairs?
+                {t('quiz.flow.stairs.title')}
               </h2>
             </div>
             <p className="text-sm text-gray-500">
-              This will help test your cardiorespiratory function.
+              {t('quiz.flow.stairs.subtitle')}
             </p>
           </div>
 
           <div className="flex flex-col gap-3">
-            {STAIRS_OPTIONS.map((option) => {
-              const isSelected = stairsAnswer === option.id;
+            {STAIRS_IDS.map((id) => {
+              const isSelected = stairsAnswer === id;
               return (
                 <button
-                  key={option.id}
+                  key={id}
                   type="button"
-                  onClick={() => handleStairsSelect(option.id)}
+                  onClick={() => handleStairsSelect(id)}
                   className={`flex cursor-pointer items-center gap-4 rounded-xl px-4 py-4 text-left shadow-sm ${
                     isSelected
                       ? QUIZ_OPTION_CARD_SELECTED
@@ -2001,12 +2270,12 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                 >
                   <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-gray-100">
                     <img
-                      src={stairsOptionImages[option.id]}
+                      src={stairsOptionImages[id]}
                       alt=""
                       className="h-full w-full object-cover"
                     />
                   </div>
-                  <span className="flex-1 font-medium text-gray-900">{option.label}</span>
+                  <span className="flex-1 font-medium text-gray-900">{t(`quiz.flow.stairs.${id}`)}</span>
                   {isSelected && <CheckCircle size={24} className={QUIZ_OPTION_CHECK_ICON} />}
                 </button>
               );
@@ -2020,17 +2289,21 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <span className="text-sm font-medium">{tLegacy('validation.selectOption')}</span>
           </div>
         )}
-
-        <div className="mt-8 flex justify-center border-t border-gray-200 pt-6">
-          <button
-            type="button"
-            onClick={handleStairsContinue}
-            disabled={!hasSelected}
-            className={CONTINUE_BUTTON_CLASSES}
-          >{t('quiz.common.continue')}
-        </button>
-        </div>
-      </div>
+      </div>,
+      {
+        backStep: 12,
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleStairsContinue}
+              disabled={!hasSelected}
+              className={CONTINUE_BUTTON_CLASSES}
+            >{t('quiz.common.continue')}
+          </button>
+          </div>
+        ),
+      },
     );
   }
 
@@ -2056,14 +2329,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
           <div className="flex justify-center">
             <WalkingIcon showLabel size="md" />
           </div>
-          <button
-            type="button"
-            className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-            aria-label={t('common.menu')}
-            onClick={() => setIsMenuOpen(true)}
-          >
-            <List size={24} weight="bold" className="text-gray-600" />
-          </button>
+          <span className="justify-self-end" aria-hidden />
         </header>
         <div className="h-1 w-full shrink-0 bg-amber-200/50">
           <div
@@ -2097,10 +2363,10 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
         <div className="flex flex-1 flex-col px-6 pb-10 pt-6 sm:px-8">
           <div className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-end text-center sm:max-w-xl">
             <h2 className="mb-4 text-2xl font-bold leading-tight text-gray-900 md:text-3xl">
-              Nurture your health with safe and low-impact Tai Chi workouts!
+              {t('quiz.flow.taiChiPromo.title')}
             </h2>
             <p className="mb-8 max-w-lg text-sm leading-relaxed text-gray-600 sm:text-base">
-              Our Tai Chi workouts focus on body awareness and gentle movements. They are a safer alternative to high-impact workouts for those prone to injuries or joint discomfort.
+              {t('quiz.flow.taiChiPromo.body')}
             </p>
           </div>
           <div className="flex justify-center pb-6 pt-2">
@@ -2113,7 +2379,6 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
           </div>
         </div>
       </div>
-      <QuizMenuDrawer open={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
       </>
     );
   }
@@ -2137,14 +2402,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
           <div className="flex justify-center">
             <WalkingIcon showLabel size="md" />
           </div>
-          <button
-            type="button"
-            className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-            aria-label={t('common.menu')}
-            onClick={() => setIsMenuOpen(true)}
-          >
-            <List size={24} weight="bold" className="text-gray-600" />
-          </button>
+          <span className="justify-self-end" aria-hidden />
         </header>
         <div className="h-1 w-full bg-amber-200/50">
           <div
@@ -2156,26 +2414,25 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
         <div className="flex flex-1 flex-col px-6">
           <div className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center py-8 text-center">
             <h2 className="text-balance text-2xl font-bold text-gray-900 md:text-3xl">
-              Not a problem! We&apos;ll balance your energy levels
+              {t('quiz.flow.energyBalance.title')}
             </h2>
             <p className="mt-3 text-xs font-semibold uppercase tracking-[0.2em] text-gray-700">
-              Weekly energy level with walking
+              {t('quiz.flow.energyBalance.subtitle')}
             </p>
 
             <div className="my-8 flex w-full max-w-lg justify-center">
               <img
                 src={energyHighIntensityDiagram}
-                alt="Energy diagram: intensity curve with high intensity at the peak"
+                alt={t('quiz.flow.energyBalance.diagramAlt')}
                 className="h-auto w-full max-h-[min(52vh,440px)] object-contain object-center drop-shadow-sm"
               />
             </div>
 
             <p className="max-w-lg text-pretty text-gray-700">
-              Our fun and engaging workouts enhance overall body mobility, gently activate your muscles,
-              and charge you for the day!
+              {t('quiz.flow.energyBalance.body1')}
             </p>
             <p className="mt-4 max-w-lg text-pretty text-gray-700">
-              Pump up your energy, stamina, and mood to enjoy every moment of your life!
+              {t('quiz.flow.energyBalance.body2')}
             </p>
           </div>
 
@@ -2185,12 +2442,11 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
               onClick={handleEnergyBalanceGotIt}
               className={`${CONTINUE_BUTTON_ALWAYS_ENABLED} w-full`}
             >
-              Got it
+              {t('quiz.flow.common.gotIt')}
             </button>
           </div>
         </div>
       </div>
-      <QuizMenuDrawer open={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
       </>
     );
   }
@@ -2201,20 +2457,15 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
       gender === 'male' ? sleepMenInBedHeroImage : sleepInBedHeroImage;
     const sleepHeroAlt =
       gender === 'male'
-        ? 'Man stretching in bed after waking up'
-        : 'Woman stretching in bed after waking up';
-    const SLEEP_OPTIONS = [
-      { id: 'less_than_5', label: 'Less than 5 hours' },
-      { id: '5_to_6', label: '5-6 hours' },
-      { id: '7_to_8', label: '7-8 hours' },
-      { id: 'more_than_8', label: 'More than 8 hours' },
-    ];
+        ? t('quiz.flow.sleep.maleAlt')
+        : t('quiz.flow.sleep.femaleAlt');
+    const SLEEP_IDS = ['less_than_5', '5_to_6', '7_to_8', 'more_than_8'];
 
     return renderQuizStepLayout(
       <div className="flex w-full max-w-lg flex-col">
         <div className="space-y-8">
           <h2 className="text-center text-2xl font-bold text-gray-900 md:text-3xl">
-            How much sleep do you usually get?
+            {t('quiz.flow.sleep.title')}
           </h2>
 
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-gray-100 shadow-sm">
@@ -2226,20 +2477,20 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            {SLEEP_OPTIONS.map((option) => {
-              const isSelected = sleepAnswer === option.id;
+            {SLEEP_IDS.map((id) => {
+              const isSelected = sleepAnswer === id;
               return (
                 <button
-                  key={option.id}
+                  key={id}
                   type="button"
-                  onClick={() => handleSleepSelect(option.id)}
+                  onClick={() => handleSleepSelect(id)}
                   className={`rounded-xl px-4 py-4 text-center font-semibold text-gray-900 shadow-sm ${
                     isSelected
                       ? QUIZ_OPTION_CARD_SELECTED
                       : `${QUIZ_OPTION_CARD_IDLE} ${QUIZ_OPTION_INTERACTIVE}`
                   }`}
                 >
-                  {option.label}
+                  {t(`quiz.flow.sleep.${id}`)}
                 </button>
               );
             })}
@@ -2251,35 +2502,30 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
 
   // Step 18: How often do you go for walks? – po Step 25 („Designed to upgrade your life“)
   if (step === 18) {
-    const WALK_FREQUENCY_OPTIONS = [
-      { id: 'almost_daily', label: 'Almost every day' },
-      { id: '3_4_week', label: '3-4 times per week' },
-      { id: '1_2_week', label: '1-2 times per week' },
-      { id: 'once_month', label: 'Once a month or less' },
-    ];
+    const WALK_FREQ_IDS = ['almost_daily', '3_4_week', '1_2_week', 'once_month'];
 
     return renderQuizStepLayout(
       <div className="flex w-full max-w-md flex-col">
         <div className="space-y-8">
           <h2 className="text-center text-2xl font-bold text-gray-900 md:text-3xl">
-            How often do you go for walks?
+            {t('quiz.flow.walkFreq.title')}
           </h2>
 
           <div className="flex flex-col gap-3">
-            {WALK_FREQUENCY_OPTIONS.map((option) => {
-              const isSelected = walkFrequencyAnswer === option.id;
+            {WALK_FREQ_IDS.map((id) => {
+              const isSelected = walkFrequencyAnswer === id;
               return (
                 <button
-                  key={option.id}
+                  key={id}
                   type="button"
-                  onClick={() => handleWalkFrequencySelect(option.id)}
+                  onClick={() => handleWalkFrequencySelect(id)}
                   className={`rounded-xl px-4 py-4 text-center font-semibold text-gray-900 shadow-sm ${
                     isSelected
                       ? QUIZ_OPTION_CARD_SELECTED
                       : `${QUIZ_OPTION_CARD_IDLE} ${QUIZ_OPTION_INTERACTIVE}`
                   }`}
                 >
-                  {option.label}
+                  {t(`quiz.flow.walkFreq.${id}`)}
                 </button>
               );
             })}
@@ -2297,27 +2543,31 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
   if (step === 19) {
     if (gender === 'male') {
       return renderQuizStepLayout(
-        <div className="mx-auto flex min-h-[calc(100vh-11rem)] w-full max-w-4xl flex-col items-center">
-          <div className="flex w-full flex-1 flex-col items-center gap-8 md:flex-row md:items-center md:justify-center md:gap-10 lg:gap-12">
+        <div className="mx-auto flex w-full max-w-4xl flex-col items-center">
+          <div className="flex w-full flex-col-reverse items-center gap-8 md:flex-row md:items-center md:justify-center md:gap-10 lg:gap-12">
             <div className="min-w-0 w-full max-w-xl space-y-4 text-center md:max-w-md md:text-left">
               <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-                Tai Chi Walking: just as effective as high-impact workouts
+                {t('quiz.flow.taiChiInfo.title')}
               </h2>
               <p className="text-pretty text-gray-700">
-                People often think walking is less effective than high-impact workouts like running.
-                But studies show <strong>Tai Chi walking</strong> — especially at a brisk pace —{' '}
-                <strong>can be a powerful way to boost your fitness</strong> and support your overall
-                well-being.
+                {t('quiz.flow.taiChiInfo.p1a')}{' '}
+                {t('quiz.flow.taiChiInfo.p1b')}{' '}
+                <strong>{t('quiz.flow.taiChiInfo.p1c')}</strong>
+                {' — '}
+                {t('quiz.flow.taiChiInfo.p1d')}
+                {' — '}
+                <strong>{t('quiz.flow.taiChiInfo.p1e')}</strong>{' '}
+                {t('quiz.flow.taiChiInfo.p1f')}
               </p>
               <p className="text-sm text-gray-600">
-                Source: &apos;Walking for Exercise&apos; Harvard Nutrition Source
+                {t('quiz.flow.taiChiInfo.source')}
               </p>
             </div>
 
             <div className="flex w-full shrink-0 justify-center md:w-auto">
               <img
                 src={menDesignedUpgradeHeroImage}
-                alt="Smiling man with arms raised, fitness and well-being"
+                alt={t('quiz.flow.taiChiInfo.maleImgAlt')}
                 className="h-auto max-h-[min(46vh,400px)] w-auto max-w-[min(92vw,300px)] object-contain object-center sm:max-h-[min(52vh,440px)] sm:max-w-[min(88vw,340px)] md:max-h-[min(58vh,500px)] md:max-w-[min(40vw,380px)]"
                 loading="eager"
                 fetchPriority="high"
@@ -2325,46 +2575,51 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
               />
             </div>
           </div>
-
-          <div className="mt-auto flex w-full justify-center pt-10 pb-2 md:pt-14 md:pb-4">
-            <button
-              type="button"
-              onClick={handleTaiChiWalkingInfoGotIt}
-              className={CONTINUE_BUTTON_ALWAYS_ENABLED}
-            >
-              Got it
-            </button>
-          </div>
         </div>,
         {
           backStep: 18,
           mainClassName: 'bg-white',
+          footer: (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={handleTaiChiWalkingInfoGotIt}
+                className={CONTINUE_BUTTON_ALWAYS_ENABLED}
+              >
+                {t('quiz.flow.common.gotIt')}
+              </button>
+            </div>
+          ),
         },
       );
     }
 
     return renderQuizStepLayout(
-      <div className="mx-auto flex min-h-[calc(100vh-11rem)] w-full max-w-4xl flex-col items-center">
-        <div className="flex w-full flex-1 flex-col items-center gap-8 md:flex-row md:items-center md:justify-center md:gap-10 lg:gap-12">
+      <div className="mx-auto flex w-full max-w-4xl flex-col items-center">
+        <div className="flex w-full flex-col-reverse items-center gap-8 md:flex-row md:items-center md:justify-center md:gap-10 lg:gap-12">
           <div className="min-w-0 w-full max-w-xl space-y-4 text-center md:max-w-md md:text-left">
             <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-              Tai Chi Walking: just as effective as high-impact workouts
+              {t('quiz.flow.taiChiInfo.title')}
             </h2>
             <p className="text-pretty text-gray-700">
-              People often think walking is less effective than high-impact workouts like running. But
-              studies show <strong>Tai Chi walking</strong> — especially at a brisk pace —{' '}
-              <strong>can be a powerful way to boost your fitness</strong> and support your overall
-              well-being.
+              {t('quiz.flow.taiChiInfo.p1a')}{' '}
+              {t('quiz.flow.taiChiInfo.p1b')}{' '}
+              <strong>{t('quiz.flow.taiChiInfo.p1c')}</strong>
+              {' — '}
+              {t('quiz.flow.taiChiInfo.p1d')}
+              {' — '}
+              <strong>{t('quiz.flow.taiChiInfo.p1e')}</strong>{' '}
+              {t('quiz.flow.taiChiInfo.p1f')}
             </p>
             <p className="text-sm text-gray-600">
-              Source: &apos;Walking for Exercise&apos; Harvard Nutrition Source
+              {t('quiz.flow.taiChiInfo.source')}
             </p>
           </div>
 
           <div className="flex w-full shrink-0 justify-center md:w-auto">
             <img
               src={taiChiWalkingHeroImage}
-              alt="Smiling woman with yoga mat and water bottle"
+              alt={t('quiz.flow.taiChiInfo.femaleImgAlt')}
               className="h-auto max-h-[min(50vh,420px)] w-auto max-w-[min(100%,300px)] object-contain object-center md:max-h-[min(60vh,520px)] md:max-w-[min(42vw,400px)]"
               loading="eager"
               fetchPriority="high"
@@ -2372,20 +2627,21 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             />
           </div>
         </div>
-
-        <div className="mt-auto flex w-full justify-center pt-10 pb-2 md:pt-14 md:pb-4">
-          <button
-            type="button"
-            onClick={handleTaiChiWalkingInfoGotIt}
-            className={CONTINUE_BUTTON_ALWAYS_ENABLED}
-          >
-            Got it
-          </button>
-        </div>
       </div>,
       {
         backStep: 18,
         mainClassName: 'bg-[#ffe8d6]',
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleTaiChiWalkingInfoGotIt}
+              className={CONTINUE_BUTTON_ALWAYS_ENABLED}
+            >
+              {t('quiz.flow.common.gotIt')}
+            </button>
+          </div>
+        ),
       },
     );
   }
@@ -2393,22 +2649,22 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
   // Step 20: What's your work schedule like? – pasirinkus automatiškai perkelia į kitą
   if (step === 20) {
     const WORK_SCHEDULE_OPTIONS = [
-      { id: '9_to_5', label: '9 to 5 job', Icon: LucideBriefcase },
-      { id: 'flexible', label: 'My hours are flexible', Icon: LucideCoffee },
-      { id: 'night_shifts', label: 'Night shifts', Icon: LucideSun },
-      { id: 'dont_work', label: "I don't work", Icon: LucideUmbrella },
-      { id: 'stay_at_home', label: 'Stay-at-home parent', Icon: Sofa },
+      { id: '9_to_5', Icon: LucideBriefcase },
+      { id: 'flexible', Icon: LucideCoffee },
+      { id: 'night_shifts', Icon: LucideSun },
+      { id: 'dont_work', Icon: LucideUmbrella },
+      { id: 'stay_at_home', Icon: Sofa },
     ];
 
     return renderQuizStepLayout(
       <div className="flex w-full max-w-md flex-col">
         <div className="space-y-8">
           <h2 className="text-center text-2xl font-bold text-gray-900 md:text-3xl">
-            What&apos;s your work schedule like?
+            {t('quiz.flow.workSchedule.title')}
           </h2>
 
           <div className="flex flex-col gap-3">
-            {WORK_SCHEDULE_OPTIONS.map(({ id, label, Icon }) => (
+            {WORK_SCHEDULE_OPTIONS.map(({ id, Icon }) => (
               <button
                 key={id}
                 type="button"
@@ -2418,7 +2674,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100">
                   <Icon size={24} className="text-gray-600" strokeWidth={2} />
                 </span>
-                <span className="font-medium text-gray-900">{label}</span>
+                <span className="font-medium text-gray-900">{t(`quiz.flow.workSchedule.${id}`)}</span>
               </button>
             ))}
           </div>
@@ -2430,12 +2686,15 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
 
   // Step 21: How active is your lifestyle? – pasirinkus automatiškai perkelia
   if (step === 21) {
-    const ACTIVITY_LEVEL_OPTIONS = [
-      { id: 'sedentary', label: 'Sedentary', sublabel: "I don't exercise or move much" },
-      { id: 'somewhat_active', label: 'Somewhat active', sublabel: "I don't exercise, but I move a lot" },
-      { id: 'active', label: 'Active', sublabel: 'I exercise a few times per week' },
-      { id: 'very_active', label: 'Very active', sublabel: 'I exercise almost every day' },
-    ];
+    const ACTIVITY_LEVEL_IDS = ['sedentary', 'somewhat_active', 'active', 'very_active'];
+    const lifestyleSubKey = (id) =>
+      id === 'sedentary'
+        ? 'sedentarySub'
+        : id === 'somewhat_active'
+          ? 'somewhat_activeSub'
+          : id === 'active'
+            ? 'activeSub'
+            : 'very_activeSub';
 
     return renderQuizStepLayout(
       <div className="flex w-full max-w-md flex-col">
@@ -2445,24 +2704,26 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <div className="flex items-center justify-center gap-2">
               <HelpCircle size={28} className={QUIZ_ICON_CLASS} />
               <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-                How active is your lifestyle?
+                {t('quiz.flow.lifestyle.title')}
               </h2>
             </div>
             <p className="mt-3 text-center text-sm text-gray-500">
-              We will take it into consideration when creating your program
+              {t('quiz.flow.lifestyle.subtitle')}
             </p>
           </div>
 
           <div className="flex flex-col gap-3">
-            {ACTIVITY_LEVEL_OPTIONS.map((option) => (
+            {ACTIVITY_LEVEL_IDS.map((id) => (
               <button
-                key={option.id}
+                key={id}
                 type="button"
-                onClick={() => handleActivityLevelSelect(option.id)}
+                onClick={() => handleActivityLevelSelect(id)}
                 className={`flex cursor-pointer flex-col items-start gap-1 rounded-xl px-4 py-4 text-left shadow-sm ${QUIZ_OPTION_CARD_IDLE} ${QUIZ_OPTION_INTERACTIVE}`}
               >
-                <span className="font-semibold text-gray-900">{option.label}</span>
-                <span className="text-sm text-gray-500">{option.sublabel}</span>
+                <span className="font-semibold text-gray-900">{t(`quiz.flow.lifestyle.${id}`)}</span>
+                <span className="text-sm text-gray-500">
+                  {t(`quiz.flow.lifestyle.${lifestyleSubKey(id)}`)}
+                </span>
               </button>
             ))}
           </div>
@@ -2474,11 +2735,11 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
   // Step 22: Are any of these activities part of your life? – multi-select
   if (step === 22) {
     const LIFESTYLE_ACTIVITIES = [
-      { id: 'walking_pet', label: 'Walking my pet', icon: 'paw' },
-      { id: 'active_time_child', label: 'Spending a lot of active time with my child', icon: 'child' },
-      { id: 'climbing_stairs', label: 'Climbing stairs frequently', icon: 'stairs' },
-      { id: 'household_tasks', label: 'Active household tasks', icon: 'house' },
-      { id: 'no', label: 'No', icon: 'x' },
+      { id: 'walking_pet', icon: 'paw' },
+      { id: 'active_time_child', icon: 'child' },
+      { id: 'climbing_stairs', icon: 'stairs' },
+      { id: 'household_tasks', icon: 'house' },
+      { id: 'no', icon: 'x' },
     ];
 
     const hasSelected = selectedActivities.length > 0;
@@ -2502,11 +2763,11 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <div className="flex items-center justify-center gap-2">
               <HelpCircle size={28} className={QUIZ_ICON_CLASS} />
               <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-                Are any of these activities part of your life?
+                {t('quiz.flow.activities.title')}
               </h2>
             </div>
             <p className="text-sm text-gray-500">
-              Choose all that apply
+              {t('quiz.flow.common.chooseAllApply')}
             </p>
           </div>
 
@@ -2528,7 +2789,9 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center">
                       {renderActivityIcon(option.icon)}
                     </span>
-                    <span className="font-medium text-gray-900">{option.label}</span>
+                    <span className="font-medium text-gray-900">
+                      {t(`quiz.flow.activities.${option.id}`)}
+                    </span>
                   </div>
                   <span
                     className={`flex h-6 w-6 shrink-0 items-center justify-center rounded border-2 transition-colors ${
@@ -2553,27 +2816,31 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <span className="text-sm font-medium">{tLegacy('validation.selectAtLeastOne')}</span>
           </div>
         )}
-
-        <div className="mt-8 flex justify-center border-t border-gray-200 pt-6">
-          <button
-            type="button"
-            onClick={handleActivitiesContinue}
-            disabled={!hasSelected}
-            className={CONTINUE_BUTTON_CLASSES}
-          >{t('quiz.common.continue')}
-        </button>
-        </div>
-      </div>
+      </div>,
+      {
+        backStep: 21,
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleActivitiesContinue}
+              disabled={!hasSelected}
+              className={CONTINUE_BUTTON_CLASSES}
+            >{t('quiz.common.continue')}
+          </button>
+          </div>
+        ),
+      },
     );
   }
 
   // Step 23: How are your energy levels during the day? – baterijos ikonos
   if (step === 23) {
     const ENERGY_OPTIONS = [
-      { id: 'low_tired', label: 'Low, I feel tired all day', bars: 1 },
-      { id: 'crash_lunch', label: 'I crash after lunch', bars: 2 },
-      { id: 'caffeine', label: 'I rely on caffeine to keep me going', bars: 3 },
-      { id: 'high_steady', label: 'High and steady all day', bars: 4 },
+      { id: 'low_tired', bars: 1 },
+      { id: 'crash_lunch', bars: 2 },
+      { id: 'caffeine', bars: 3 },
+      { id: 'high_steady', bars: 4 },
     ];
 
     const EnergyBatteryIcon = ({ bars }) => {
@@ -2592,7 +2859,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <div className="flex items-center justify-center gap-2">
               <HelpCircle size={28} className={QUIZ_ICON_CLASS} />
               <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-                How are your energy levels during the day?
+                {t('quiz.flow.energyLevels.title')}
               </h2>
             </div>
           </div>
@@ -2608,7 +2875,9 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100">
                   <EnergyBatteryIcon bars={option.bars} />
                 </span>
-                <span className="font-medium text-gray-900">{option.label}</span>
+                <span className="font-medium text-gray-900">
+                  {t(`quiz.flow.energyLevels.${option.id}`)}
+                </span>
               </button>
             ))}
           </div>
@@ -2619,12 +2888,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
 
   // Step 24: Where do you prefer to exercise? – multi-select
   if (step === 24) {
-    const EXERCISE_PREFERENCE_OPTIONS = [
-      { id: 'home', label: 'Home' },
-      { id: 'outside', label: 'Outside' },
-      { id: 'gym', label: 'Gym' },
-      { id: 'no_preference', label: 'No preference' },
-    ];
+    const EXERCISE_IDS = ['home', 'outside', 'gym', 'no_preference'];
 
     const hasSelected = selectedExercisePreference.length > 0;
 
@@ -2635,27 +2899,27 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <div className="flex items-center justify-center gap-2">
               <HelpCircle size={28} className={QUIZ_ICON_CLASS} />
               <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-                Where do you prefer to exercise?
+                {t('quiz.flow.exercisePlace.title')}
               </h2>
             </div>
-            <p className="text-sm text-gray-500">Choose all that apply</p>
+            <p className="text-sm text-gray-500">{t('quiz.flow.common.chooseAllApply')}</p>
           </div>
 
           <div className="flex flex-col gap-3">
-            {EXERCISE_PREFERENCE_OPTIONS.map((option) => {
-              const isSelected = selectedExercisePreference.includes(option.id);
+            {EXERCISE_IDS.map((id) => {
+              const isSelected = selectedExercisePreference.includes(id);
               return (
                 <button
-                  key={option.id}
+                  key={id}
                   type="button"
-                  onClick={() => handleExercisePreferenceToggle(option.id)}
+                  onClick={() => handleExercisePreferenceToggle(id)}
                   className={`flex cursor-pointer items-center justify-between gap-4 rounded-xl px-4 py-4 text-left shadow-sm ${
                     isSelected
                       ? QUIZ_OPTION_CARD_SELECTED
                       : `${QUIZ_OPTION_CARD_IDLE} ${QUIZ_OPTION_INTERACTIVE}`
                   }`}
                 >
-                  <span className="font-medium text-gray-900">{option.label}</span>
+                  <span className="font-medium text-gray-900">{t(`quiz.flow.exercisePlace.${id}`)}</span>
                   <span
                     className={`flex h-6 w-6 shrink-0 items-center justify-center rounded border-2 transition-colors ${
                       isSelected
@@ -2679,18 +2943,21 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <span className="text-sm font-medium">{tLegacy('validation.selectAtLeastOne')}</span>
           </div>
         )}
-
-        <div className="mt-8 flex justify-center border-t border-gray-200 pt-6">
-          <button
-            type="button"
-            onClick={handleExercisePreferenceContinue}
-            disabled={!hasSelected}
-            className={CONTINUE_BUTTON_CLASSES}
-          >{t('quiz.common.continue')}
-        </button>
-        </div>
       </div>,
-      { backStep: 19 },
+      {
+        backStep: 19,
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleExercisePreferenceContinue}
+              disabled={!hasSelected}
+              className={CONTINUE_BUTTON_CLASSES}
+            >{t('quiz.common.continue')}
+          </button>
+          </div>
+        ),
+      },
     );
   }
 
@@ -2700,19 +2967,18 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
       gender === 'male' ? lifestyleBubblesMenImage : lifestyleBubblesImage;
     const bubblesAlt =
       gender === 'male'
-        ? 'Men and lifestyle moments in circular frames'
-        : 'People and lifestyle moments in circular frames';
+        ? t('quiz.flow.lifestyleUpgrade.bubblesAltMale')
+        : t('quiz.flow.lifestyleUpgrade.bubblesAltFemale');
 
     return renderQuizStepLayout(
       <div className="flex w-full max-w-lg flex-col items-center text-center">
         <div className="w-full space-y-6 px-2 py-4">
           <div className="space-y-3">
             <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-              Designed to upgrade your life
+              {t('quiz.flow.lifestyleUpgrade.title')}
             </h2>
             <p className="text-pretty text-base leading-relaxed text-gray-700">
-              We&apos;ll tailor our workouts to your lifestyle to help you move your body, build
-              confidence, and have fun.
+              {t('quiz.flow.lifestyleUpgrade.body')}
             </p>
           </div>
           <div className="flex justify-center">
@@ -2723,19 +2989,19 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             />
           </div>
         </div>
-        <div className="mt-8 w-full max-w-md">
+      </div>,
+      {
+        backStep: 17,
+        mainClassName: 'bg-[#ffe8d6]',
+        footer: (
           <button
             type="button"
             onClick={handleLifestyleUpgradeGreat}
             className={`${CONTINUE_BUTTON_ALWAYS_ENABLED} w-full`}
           >
-            Great!
+            {t('quiz.flow.common.great')}
           </button>
-        </div>
-      </div>,
-      {
-        backStep: 17,
-        mainClassName: 'bg-[#ffe8d6]',
+        ),
       },
     );
   }
@@ -2746,43 +3012,39 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
       gender === 'male' ? menDesiredWalkHeroImage : desiredWalkHeroImage;
     const walkHeroAlt =
       gender === 'male'
-        ? 'Man doing a side stretch, walking and fitness'
-        : 'Woman stretching with arms raised';
+        ? t('quiz.flow.walkPerWeek.maleWalkAlt')
+        : t('quiz.flow.walkPerWeek.femaleWalkAlt');
 
-    const DESIRED_WALK_OPTIONS = [
-      { id: '1_2_times', label: '1-2 times' },
-      { id: '3_4_times', label: '3-4 times' },
-      { id: '5_plus_times', label: '5+ times' },
-    ];
+    const DESIRED_WALK_IDS = ['1_2_times', '3_4_times', '5_plus_times'];
 
     return renderQuizStepLayout(
       <div className="flex w-full max-w-5xl flex-col gap-8 md:flex-row md:items-end md:justify-between md:gap-10">
         <div className="flex w-full min-w-0 flex-1 flex-col">
           <div className="space-y-6">
-            <div className="space-y-2 text-center md:text-left">
-              <div className="flex flex-col items-center gap-2 sm:flex-row sm:justify-center md:justify-start md:gap-2">
+            <div className="space-y-2 text-center">
+              <div className="flex flex-col items-center justify-center gap-2 sm:flex-row sm:justify-center">
                 <HelpCircle size={28} className={QUIZ_ICON_CLASS} />
                 <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-                  How many times per week would you like to walk?
+                  {t('quiz.flow.walkPerWeek.title')}
                 </h2>
               </div>
             </div>
 
-            <div className="mx-auto flex w-full max-w-md flex-col gap-3 md:mx-0">
-              {DESIRED_WALK_OPTIONS.map((option) => {
-                const isSelected = desiredWalkFrequency === option.id;
+            <div className="mx-auto flex w-full max-w-md flex-col gap-3">
+              {DESIRED_WALK_IDS.map((id) => {
+                const isSelected = desiredWalkFrequency === id;
                 return (
                   <button
-                    key={option.id}
+                    key={id}
                     type="button"
-                    onClick={() => handleDesiredWalkFrequencySelect(option.id)}
+                    onClick={() => handleDesiredWalkFrequencySelect(id)}
                     className={`rounded-xl px-4 py-4 text-left font-semibold text-gray-900 shadow-sm ${
                       isSelected
                         ? QUIZ_OPTION_CARD_SELECTED
                         : `${QUIZ_OPTION_CARD_IDLE} ${QUIZ_OPTION_INTERACTIVE}`
                     }`}
                   >
-                    {option.label}
+                    {t(`quiz.flow.walkPerWeek.${id}`)}
                   </button>
                 );
               })}
@@ -2816,12 +3078,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
 
   // Step 27: How many steps do you think you need in a day?
   if (step === 27) {
-    const DAILY_STEPS_OPTIONS = [
-      { id: 'easy', label: 'Easy: <5K steps' },
-      { id: 'medium', label: 'Medium: 5-10K steps' },
-      { id: 'hard', label: 'Hard: >10K steps' },
-      { id: 'not_sure', label: "I'm not sure" },
-    ];
+    const DAILY_STEPS_IDS = ['easy', 'medium', 'hard', 'not_sure'];
 
     return renderQuizStepLayout(
       <div className="flex w-full max-w-md flex-col">
@@ -2830,26 +3087,26 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <div className="flex items-center justify-center gap-2">
               <HelpCircle size={28} className={QUIZ_ICON_CLASS} />
               <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-                How many steps do you think you need in a day?
+                {t('quiz.flow.dailySteps.title')}
               </h2>
             </div>
           </div>
 
           <div className="flex flex-col gap-3">
-            {DAILY_STEPS_OPTIONS.map((option) => {
-              const isSelected = dailyStepsAnswer === option.id;
+            {DAILY_STEPS_IDS.map((id) => {
+              const isSelected = dailyStepsAnswer === id;
               return (
                 <button
-                  key={option.id}
+                  key={id}
                   type="button"
-                  onClick={() => handleDailyStepsSelect(option.id)}
+                  onClick={() => handleDailyStepsSelect(id)}
                   className={`rounded-xl px-4 py-4 text-left font-semibold text-gray-900 shadow-sm ${
                     isSelected
                       ? QUIZ_OPTION_CARD_SELECTED
                       : `${QUIZ_OPTION_CARD_IDLE} ${QUIZ_OPTION_INTERACTIVE}`
                   }`}
                 >
-                  {option.label}
+                  {t(`quiz.flow.dailySteps.${id}`)}
                 </button>
               );
             })}
@@ -2862,51 +3119,40 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
 
   // Step 28: They did it. You can do too! – transformation / social proof (karuselė: 88 kg → 147 kg)
   if (step === 28) {
-    const TRANSFORMATION_TESTIMONIALS = [
-      {
-        heroImage: testimonialSlide88kg,
-        beforeWeight: '88 KG',
-        afterWeight: '80 kg',
-        name: 'Lily Morgan',
-        quote:
-          "This app turned my walks into real progress. I'm seeing the difference on the scale and in my mood!",
-      },
-      {
-        heroImage: testimonialSlide147kg,
-        beforeWeight: '147 KG',
-        afterWeight: '108 kg',
-        name: 'Noah Bennett',
-        quote:
-          "I've lost weight without even realizing it - just by walking daily with this app. It actually made fitness fun for once.",
-      },
-    ];
-
-    const t = TRANSFORMATION_TESTIMONIALS[testimonialIndex];
+    const slide = TRANSFORMATION_TESTIMONIALS[testimonialIndex];
+    const slideName = t(`quiz.flow.transformation.${slide.nameKey}`);
+    const slideQuote = t(`quiz.flow.transformation.${slide.quoteKey}`);
 
     return renderQuizStepLayout(
       <div className="flex w-full max-w-lg flex-col">
         <div className="space-y-6">
           <h2 className="text-center text-2xl font-bold leading-tight text-gray-900 md:text-3xl">
-            They did it.{' '}
-            <span className="text-[#FF7A45]">You can do too!</span> Start your transformation today!
+            {t('quiz.flow.transformation.titleThey')}{' '}
+            <span className="text-[#FF7A45]">{t('quiz.flow.transformation.titleYou')}</span>{' '}
+            {t('quiz.flow.transformation.titleCta')}
           </h2>
 
-          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-md">
+          <div
+            className="touch-manipulation overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-md"
+            onPointerDown={handleTransformationTestimonialPointerDown}
+            onPointerUp={handleTransformationTestimonialPointerUp}
+            onPointerCancel={handleTransformationTestimonialPointerCancel}
+          >
             <div className="mb-4 flex justify-center">
               <img
                 key={testimonialIndex}
-                src={t.heroImage}
-                alt={`${t.name} — before and after`}
+                src={slide.heroImage}
+                alt={`${slideName} — before and after`}
                 className="max-h-[min(52vh,280px)] w-full max-w-md rounded-xl object-contain object-center transition-opacity duration-300"
               />
             </div>
             <div className="mb-3 flex flex-wrap items-center justify-center gap-2 text-2xl font-bold text-amber-600">
-              <span>{t.beforeWeight}</span>
+              <span>{slide.beforeWeight}</span>
               <span className="text-lg font-semibold text-gray-400">&gt;</span>
-              <span>{t.afterWeight}</span>
+              <span>{slide.afterWeight}</span>
             </div>
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span className="font-semibold text-gray-900">{t.name}</span>
+              <span className="font-semibold text-gray-900">{slideName}</span>
               <div className="flex gap-0.5" aria-hidden>
                 {[1, 2, 3, 4, 5].map((i) => (
                   <Star key={i} size={18} weight="fill" className="text-yellow-400" />
@@ -2914,7 +3160,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
               </div>
             </div>
             <p className="text-pretty text-sm leading-relaxed text-gray-600 md:text-base">
-              &quot;{t.quote}&quot;
+              &quot;{slideQuote}&quot;
             </p>
             <div className="mt-4 flex justify-center gap-2">
               {TRANSFORMATION_TESTIMONIALS.map((_, i) => (
@@ -2925,40 +3171,46 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                   className={`h-2 w-2 rounded-full transition-colors ${
                     i === testimonialIndex ? 'bg-[#FF7A45]' : 'bg-gray-300'
                   }`}
-                  aria-label={`Testimonial ${i + 1} of ${TRANSFORMATION_TESTIMONIALS.length}`}
+                  aria-label={t('quiz.flow.transformation.testimonialAria', {
+                    n: i + 1,
+                    total: TRANSFORMATION_TESTIMONIALS.length,
+                  })}
                   aria-current={i === testimonialIndex ? 'true' : undefined}
                 />
               ))}
             </div>
           </div>
-
+        </div>
+      </div>,
+      {
+        backStep: 27,
+        footer: (
           <div className="flex justify-center">
             <button
               type="button"
               onClick={handleTransformationContinue}
               className={`${CONTINUE_BUTTON_ALWAYS_ENABLED} bg-[#FF7A45] hover:bg-[#e86a38]`}
             >
-              Let&apos;s Do It!
+              {t('quiz.flow.common.letsDoIt')}
             </button>
           </div>
-        </div>
-      </div>,
-      { backStep: 27 },
+        ),
+      },
     );
   }
 
   // Step 29: Have any of the following events led to weight gain? – multi-select
   if (step === 29) {
     const WEIGHT_GAIN_EVENTS = [
-      { id: 'work_pressure', label: 'Work pressure', Icon: LucideBriefcase },
-      { id: 'busy_family', label: 'Busy family life', Icon: House },
-      { id: 'divorce_breakup', label: 'Divorce or breakup', Icon: HeartBreak },
-      { id: 'slower_metabolism', label: 'Slower metabolism due to aging', Icon: Clock },
-      { id: 'financial', label: 'Financial challenges', Icon: CurrencyDollar },
-      { id: 'covid', label: 'Covid-19 pandemic', Icon: Virus },
-      { id: 'injury_disability', label: 'Injury or disability', Icon: Lightning },
-      { id: 'other_stressful', label: 'Other stressful events', Icon: Question },
-      { id: 'none', label: 'None of the above', Icon: XCircle },
+      { id: 'work_pressure', Icon: LucideBriefcase },
+      { id: 'busy_family', Icon: House },
+      { id: 'divorce_breakup', Icon: HeartBreak },
+      { id: 'slower_metabolism', Icon: Clock },
+      { id: 'financial', Icon: CurrencyDollar },
+      { id: 'covid', Icon: Virus },
+      { id: 'injury_disability', Icon: Lightning },
+      { id: 'other_stressful', Icon: Question },
+      { id: 'none', Icon: XCircle },
     ];
 
     const hasSelected = selectedWeightGainEvents.length > 0;
@@ -2970,10 +3222,10 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <div className="flex items-center justify-center gap-2">
               <HelpCircle size={28} className={QUIZ_ICON_CLASS} />
               <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-                Have any of the following events led to weight gain in the last few years?
+                {t('quiz.flow.weightGain.titleQuiz')}
               </h2>
             </div>
-            <p className="text-sm text-gray-500">Choose all that apply</p>
+            <p className="text-sm text-gray-500">{t('quiz.flow.common.chooseAllApply')}</p>
           </div>
 
           <div className="flex flex-col gap-3">
@@ -2999,7 +3251,9 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                         <IconComponent size={24} weight="regular" className="text-gray-600" />
                       )}
                     </span>
-                    <span className="font-medium text-gray-900">{option.label}</span>
+                    <span className="font-medium text-gray-900">
+                      {t(`quiz.flow.weightGain.${option.id}`)}
+                    </span>
                   </div>
                   <span
                     className={`flex h-6 w-6 shrink-0 items-center justify-center rounded border-2 transition-colors ${
@@ -3020,26 +3274,30 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <span className="text-sm font-medium">{tLegacy('validation.selectAtLeastOne')}</span>
           </div>
         )}
-
-        <div className="mt-8 flex justify-center border-t border-gray-200 pt-6">
-          <button
-            type="button"
-            onClick={handleWeightGainEventsContinue}
-            disabled={!hasSelected}
-            className={CONTINUE_BUTTON_CLASSES}
-          >{t('quiz.common.continue')}
-        </button>
-        </div>
-      </div>
+      </div>,
+      {
+        backStep: 28,
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleWeightGainEventsContinue}
+              disabled={!hasSelected}
+              className={CONTINUE_BUTTON_CLASSES}
+            >{t('quiz.common.continue')}
+          </button>
+          </div>
+        ),
+      },
     );
   }
 
   // Step 30: What's your biggest motivation? – single-choice
   if (step === 30) {
     const MOTIVATION_OPTIONS = [
-      { id: 'confident', label: 'Feel more confident in my body', Icon: Person },
-      { id: 'healthier', label: 'Be healthier and more energetic', Icon: Heartbeat },
-      { id: 'other', label: 'Other', Icon: DotsThree },
+      { id: 'confident', Icon: Person },
+      { id: 'healthier', Icon: Heartbeat },
+      { id: 'other', Icon: DotsThree },
     ];
 
     return renderQuizStepLayout(
@@ -3049,7 +3307,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <div className="flex items-center justify-center gap-2">
               <HelpCircle size={28} className={QUIZ_ICON_CLASS} />
               <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-                What&apos;s your biggest motivation?
+                {t('quiz.flow.motivation.biggestMotivationTitle')}
               </h2>
             </div>
           </div>
@@ -3072,7 +3330,9 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100">
                     <IconComponent size={24} weight="regular" className="text-gray-600" />
                   </span>
-                  <span className="font-medium text-gray-900">{option.label}</span>
+                  <span className="font-medium text-gray-900">
+                    {t(`quiz.flow.motivation.${option.id}`)}
+                  </span>
                 </button>
               );
             })}
@@ -3082,91 +3342,79 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
     );
   }
 
-  // Step 31: We help you achieve long-term results – informacinis ekranas su grafiku
+  // Step 31: We help you achieve long-term results – informacinis ekranas su SVG grafiku
   if (step === 31) {
+    const longTermScreenBg =
+      'bg-gradient-to-b from-[#fffefb] via-[#fff8f0] to-[#ffe8d4]';
     return renderQuizStepLayout(
-      <div className="flex w-full max-w-lg flex-col gap-6">
-        <h2 className="text-center text-2xl font-bold text-gray-900 md:text-3xl">
-          We help you achieve long-term results
+      <div className="flex w-full max-w-lg flex-col gap-6 pb-2">
+        <h2 className="text-balance text-center text-2xl font-bold leading-tight text-gray-900 md:text-3xl">
+          {t('quiz.flow.longTerm.title')}
         </h2>
 
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-md">
-          <p className="mb-4 text-center text-sm font-semibold text-gray-600">YOUR WEIGHT</p>
-          <div className="relative">
-            <svg
-              viewBox="0 0 320 180"
-              className="h-48 w-full"
-              preserveAspectRatio="xMidYMid meet"
+        <div className="overflow-hidden rounded-2xl border border-gray-200/90 bg-white p-4 shadow-md sm:p-6">
+          <p className="mb-3 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-gray-500 sm:mb-4 sm:text-xs">
+            {t('quiz.flow.longTerm.chartYourWeight')}
+          </p>
+          <div className="relative w-full">
+            <img
+              src={longTermResultsChartSvg}
+              alt=""
+              className="h-auto w-full max-h-[min(46vh,220px)] object-contain object-center sm:max-h-[min(52vh,260px)]"
+              decoding="async"
+              fetchPriority="high"
+            />
+            <div
+              className="pointer-events-none absolute inset-0 select-none"
+              aria-hidden
             >
-              <defs>
-                <linearGradient id="greenGradientLongTerm" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#22c55e" stopOpacity="0.3" />
-                  <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <line x1="40" y1="20" x2="40" y2="150" stroke="#e5e7eb" strokeWidth="1" />
-              <line x1="40" y1="150" x2="300" y2="150" stroke="#e5e7eb" strokeWidth="1" />
-              <text x="25" y="95" fontSize="10" fill="#9ca3af">Today</text>
-              <text x="245" y="170" fontSize="10" fill="#9ca3af">In a month</text>
-              {/* Red line: exhausting workouts - drops then spikes up */}
-              <path
-                d="M 40 45 Q 140 120 200 95 Q 250 70 280 115"
-                fill="none"
-                stroke="#ef4444"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              {/* Green area + line: Tai Chi Walking - smooth downward */}
-              <path
-                d="M 40 45 Q 120 75 200 95 Q 250 115 280 135 L 280 150 L 40 150 Z"
-                fill="url(#greenGradientLongTerm)"
-              />
-              <path
-                d="M 40 45 Q 120 75 200 95 Q 250 115 280 135"
-                fill="none"
-                stroke="#22c55e"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <rect x="195" y="55" width="85" height="22" rx="4" fill="#fce7f3" />
-              <text x="205" y="70" fontSize="8" fill="#be185d" fontWeight="600">
-                With exhausting workouts
-              </text>
-              <rect x="110" y="118" width="105" height="22" rx="4" fill="#dcfce7" />
-              <text x="120" y="133" fontSize="8" fill="#15803d" fontWeight="600">
-                With Tai Chi Walking
-              </text>
-            </svg>
+              <div
+                className="absolute right-[0%] top-[4%] max-w-[min(52%,11rem)] rounded-md bg-pink-100/95 px-2 py-1 text-center text-[9px] font-semibold leading-tight text-pink-900 shadow-sm ring-1 ring-pink-200/80 sm:right-[1%] sm:top-[6%] sm:max-w-[48%] sm:px-2.5 sm:py-1.5 sm:text-[10px] md:text-xs"
+              >
+                {t('quiz.flow.longTerm.chartExhausting')}
+              </div>
+              <div
+                className="absolute bottom-[14%] right-[1%] max-w-[min(56%,12rem)] rounded-xl bg-[#3dcc6e] px-2 py-1.5 text-center text-[9px] font-semibold leading-tight text-white shadow-md sm:bottom-[16%] sm:right-[2%] sm:px-2.5 sm:py-2 sm:text-[10px] md:text-xs"
+              >
+                {t('quiz.flow.longTerm.chartTaiChi')}
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 flex items-end justify-between gap-2 border-t border-gray-100 pt-3 text-xs font-medium text-gray-500 sm:text-sm">
+            <span>{t('quiz.flow.longTerm.chartToday')}</span>
+            <span className="text-right">{t('quiz.flow.longTerm.chartMonth')}</span>
           </div>
         </div>
 
-        <div className="flex items-start gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-gray-200">
+        <div className="flex items-start gap-3 rounded-2xl border border-gray-200/90 bg-white/95 p-4 shadow-sm backdrop-blur-[2px] sm:gap-4 sm:p-5">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-gray-200 sm:h-14 sm:w-14">
             <img
               src={drNikoAmblemaImage}
-              alt="Stanford University"
+              alt={t('quiz.flow.longTerm.stanfordAlt')}
               className="h-full w-full object-contain object-center p-0.5"
               decoding="async"
             />
           </div>
-          <p className="text-sm text-gray-700">
-            <strong>Dr Nick Smeeton from Stanford University</strong> reported that Tai Chi walking
-            reduces fatigue, improves emotional state, and is less taxing on the body than
-            exhausting gym workouts.
+          <p className="text-left text-sm leading-relaxed text-gray-700 sm:text-[15px]">
+            <strong className="text-gray-900">{t('quiz.flow.longTerm.drQuote')}</strong>{' '}
+            {t('quiz.flow.longTerm.drQuoteBody')}
           </p>
         </div>
-
-        <div className="flex justify-center">
-          <button
-            type="button"
-            onClick={handleLongTermResultsContinue}
-            className={CONTINUE_BUTTON_ALWAYS_ENABLED}
-          >{t('quiz.common.continue')}
-        </button>
-        </div>
-      </div>
+      </div>,
+      {
+        backStep: 30,
+        screenClassName: longTermScreenBg,
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleLongTermResultsContinue}
+              className={CONTINUE_BUTTON_ALWAYS_ENABLED}
+            >{t('quiz.common.continue')}
+            </button>
+          </div>
+        ),
+      },
     );
   }
 
@@ -3183,10 +3431,10 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
         <div className="space-y-6">
           <div className="space-y-2 text-center">
             <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-              What&apos;s your height?
+              {t('quiz.flow.height.title')}
             </h2>
             <p className="text-sm text-gray-500">
-              Your plan is created according to the body mass index (BMI)
+              {t('quiz.flow.height.subtitle')}
             </p>
           </div>
 
@@ -3228,17 +3476,21 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             />
           </div>
         </div>
-
-        <div className="mt-8 flex justify-center border-t border-gray-200 pt-6">
-          <button
-            type="button"
-            onClick={handleHeightContinue}
-            disabled={!hasValidHeight}
-            className={CONTINUE_BUTTON_CLASSES}
-          >{t('quiz.common.continue')}
-        </button>
-        </div>
-      </div>
+      </div>,
+      {
+        backStep: 31,
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleHeightContinue}
+              disabled={!hasValidHeight}
+              className={CONTINUE_BUTTON_CLASSES}
+            >{t('quiz.common.continue')}
+          </button>
+          </div>
+        ),
+      },
     );
   }
 
@@ -3255,10 +3507,10 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
         <div className="space-y-6">
           <div className="space-y-2 text-center">
             <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-              Your current weight
+              {t('quiz.flow.currentWeight.title')}
             </h2>
             <p className="text-sm text-gray-500">
-              We will use this information to calculate your body mass index (BMI)
+              {t('quiz.flow.currentWeight.subtitle')}
             </p>
           </div>
 
@@ -3274,21 +3526,25 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
               max={300}
             />
             <span className="rounded-lg bg-orange-500 px-3 py-2 text-sm font-bold text-white">
-              KG
+              {t('quiz.flow.common.kg')}
             </span>
           </div>
         </div>
-
-        <div className="mt-8 flex justify-center border-t border-gray-200 pt-6">
-          <button
-            type="button"
-            onClick={handleCurrentWeightContinue}
-            disabled={!hasValidWeight}
-            className={CONTINUE_BUTTON_CLASSES}
-          >{t('quiz.common.continue')}
-        </button>
-        </div>
-      </div>
+      </div>,
+      {
+        backStep: 32,
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleCurrentWeightContinue}
+              disabled={!hasValidWeight}
+              className={CONTINUE_BUTTON_CLASSES}
+            >{t('quiz.common.continue')}
+          </button>
+          </div>
+        ),
+      },
     );
   }
 
@@ -3306,10 +3562,10 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
         <div className="space-y-6">
           <div className="space-y-2 text-center">
             <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-              Your goal weight
+              {t('quiz.flow.goalWeight.title')}
             </h2>
             <p className="text-sm text-gray-500">
-              What is the ideal weight you want to reach?
+              {t('quiz.flow.goalWeight.subtitle')}
             </p>
           </div>
 
@@ -3325,21 +3581,25 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
               max={300}
             />
             <span className="rounded-lg bg-orange-500 px-3 py-2 text-sm font-bold text-white">
-              KG
+              {t('quiz.flow.common.kg')}
             </span>
           </div>
         </div>
-
-        <div className="mt-8 flex justify-center border-t border-gray-200 pt-6">
-          <button
-            type="button"
-            onClick={handleGoalWeightContinue}
-            disabled={!hasValidGoal}
-            className={CONTINUE_BUTTON_CLASSES}
-          >{t('quiz.common.continue')}
-        </button>
-        </div>
-      </div>
+      </div>,
+      {
+        backStep: 33,
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleGoalWeightContinue}
+              disabled={!hasValidGoal}
+              className={CONTINUE_BUTTON_CLASSES}
+            >{t('quiz.common.continue')}
+          </button>
+          </div>
+        ),
+      },
     );
   }
 
@@ -3355,38 +3615,22 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
     const getBmiCategory = (val) => {
       const v = Number(val);
       if (Number.isNaN(v)) return null;
-      if (v < 18.5) return { label: 'UNDERWEIGHT', badgeClass: 'bg-cyan-500' };
-      if (v < 25) return { label: 'NORMAL', badgeClass: 'bg-green-600' };
-      if (v < 30) return { label: 'OVERWEIGHT', badgeClass: 'bg-amber-500' };
-      return { label: 'OBESE', badgeClass: 'bg-red-600' };
+      if (v < 18.5) return { bmiKey: 'bmiUnderweight', badgeClass: 'bg-cyan-500' };
+      if (v < 25) return { bmiKey: 'bmiNormal', badgeClass: 'bg-green-600' };
+      if (v < 30) return { bmiKey: 'bmiOverweight', badgeClass: 'bg-amber-500' };
+      return { bmiKey: 'bmiObese', badgeClass: 'bg-red-600' };
     };
 
     const bmiCategory = bmi ? getBmiCategory(bmi) : null;
-    const bmiPosition = bmi
-      ? Math.min(100, Math.max(0, ((Number(bmi) - 15) / 25) * 100))
-      : 50;
+    const bmiNeedleTransition = 'left 1.15s cubic-bezier(0.22, 1, 0.36, 1)';
 
-    const DREAM_BODY_LABELS =
-      gender === 'male'
-        ? {
-            thin: 'Thin',
-            toned: 'Toned',
-            curvy: 'Shapely',
-            healthy: 'Healthy',
-          }
-        : {
-            thin: 'Thin',
-            toned: 'Toned',
-            curvy: 'Curvy',
-            healthy: 'Healthy',
-          };
+    const dreamBodyLabelFor = (id) =>
+      id === 'curvy'
+        ? gender === 'male'
+          ? t('quiz.flow.dreamBody.curvyMale')
+          : t('quiz.flow.dreamBody.curvyFemale')
+        : t(`quiz.flow.dreamBody.${id}`);
     const DREAM_BODY_PHOTOS = gender === 'male' ? MALE_DREAM_BODY_IMAGES : DREAM_BODY_IMAGES;
-    const ACTIVITY_LABELS = {
-      sedentary: 'Sedentary',
-      somewhat_active: 'Somewhat active',
-      active: 'Active',
-      very_active: 'Very active',
-    };
 
     /** Kai BMI pakeltas – rodomas realistiškesnis siluetas (ne „dream body“). */
     const highBmiFigureSrc =
@@ -3407,148 +3651,184 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
     const figureAlt =
       highBmiFigureSrc != null
         ? gender === 'male'
-          ? 'Male silhouette matching overweight BMI range'
-          : 'Female silhouette matching overweight BMI range'
+          ? t('quiz.flow.profile.figureAltMale')
+          : t('quiz.flow.profile.figureAltFemale')
         : '';
+
+    /** Moterų profilio iliustracija – kaip rinkodaros maketas (walking profile) */
+    const profileCardImageSrc =
+      gender === 'male' ? figureSrc : walkingProfileHeroImage;
+    const profileCardImageAlt =
+      gender === 'male'
+        ? figureAlt
+        : t('quiz.flow.profile.walkingProfilePhotoAlt');
+
+    const BMI_SCALE_TICKS = [15, 18.5, 25, 30, 40];
 
     return renderQuizStepLayout(
       <div className="flex w-full max-w-lg flex-col gap-8">
-        <h2 className="text-center text-2xl font-bold tracking-tight text-gray-900 md:text-3xl">
-          Your walking profile
+        <h2 className="text-center text-2xl font-bold tracking-tight text-[#1a2b3c] md:text-3xl">
+          {t('quiz.flow.profile.title')}
         </h2>
 
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_4px_24px_rgba(0,0,0,0.06)] md:p-6">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <h3 className="text-base font-bold text-gray-900 md:text-lg">
-              Body mass index (BMI)
-            </h3>
-            {bmiCategory && (
-              <span
-                className={`shrink-0 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white ${bmiCategory.badgeClass}`}
-              >
-                {bmiCategory.label}
-              </span>
-            )}
-          </div>
+        <div className="overflow-hidden rounded-[2.5rem] bg-white p-6 shadow-sm sm:p-8">
+              <div className="mb-6 flex items-start justify-between gap-3">
+                <h3 className="text-base font-bold text-[#1a2b3c] md:text-lg">
+                  {t('quiz.flow.profile.bmiHeading')}
+                </h3>
+                {bmiCategory && (
+                  <span
+                    className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white ${bmiCategory.badgeClass}`}
+                  >
+                    {t(`quiz.flow.profile.${bmiCategory.bmiKey}`)}
+                  </span>
+                )}
+              </div>
 
-          {/* Tooltip „You – X.X“ virš juostos */}
-          <div className="relative mb-2 h-14 w-full">
-            {bmi && (
-              <div
-                className="absolute bottom-0 z-20 flex flex-col items-center"
-                style={{ left: `${bmiPosition}%`, transform: 'translateX(-50%)' }}
-              >
-                <div className="whitespace-nowrap rounded-lg bg-gray-900 px-3 py-2 text-xs font-semibold text-white shadow-md">
-                  You - {bmi}
-                </div>
+              {/* Skaičiai ir žymės virš juostos (maketas 1:1) */}
+              <div className="relative mb-3 h-5 w-full">
+                {BMI_SCALE_TICKS.map((tick) => (
+                  <div
+                    key={tick}
+                    className="absolute top-0 flex -translate-x-1/2 flex-col items-center"
+                    style={{ left: `${((tick - 15) / 25) * 100}%` }}
+                  >
+                    <span className="text-[11px] font-medium tabular-nums text-gray-400">{tick}</span>
+                    <div className="mt-0.5 h-2 w-px bg-gray-300" aria-hidden />
+                  </div>
+                ))}
+              </div>
+
+              {/* Įrankinė virš juostos, žymeklis ant gradiento */}
+              <div className="relative mt-1">
+                {bmi && (
+                  <div
+                    className="absolute bottom-full left-0 z-20 mb-1 flex w-0 flex-col items-center"
+                    style={{
+                      left: `${profileBmiNeedlePct}%`,
+                      transform: 'translateX(-50%)',
+                      transition: bmiNeedleTransition,
+                    }}
+                  >
+                    <div className="whitespace-nowrap rounded-xl bg-[#343a40] px-3 py-1.5 text-sm font-bold text-white shadow-sm">
+                      {t('quiz.flow.profile.youTooltip', { bmi })}
+                    </div>
+                    <div className="h-2 w-px shrink-0 bg-[#343a40]" aria-hidden />
+                  </div>
+                )}
                 <div
-                  className="h-0 w-0 border-x-[7px] border-t-[8px] border-x-transparent border-t-gray-900"
-                  aria-hidden
+                  className="relative h-3.5 w-full rounded-full bg-gradient-to-r from-sky-300 via-emerald-400 via-amber-200 via-orange-400 to-red-500 shadow-inner"
+                  role="img"
+                  aria-label={t('quiz.flow.profile.bmiHeading')}
                 />
+                {bmi && (
+                  <div
+                    className="pointer-events-none absolute left-0 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center"
+                    style={{
+                      left: `${profileBmiNeedlePct}%`,
+                      transition: bmiNeedleTransition,
+                    }}
+                  >
+                    <div className="flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-white shadow-[0_0_0_2px_#343a40]">
+                      <div className="h-2 w-2 rounded-full bg-[#343a40]" aria-hidden />
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {/* Spalvota BMI juosta (proporcijos: 15–18.5 / 18.5–25 / 25–30 / 30–40) */}
-          <div className="relative h-9 w-full overflow-hidden rounded-full shadow-inner">
-            <div className="absolute inset-0 flex">
-              <div className="h-full w-[14%] bg-cyan-300" title="Underweight" />
-              <div className="h-full w-[26%] bg-green-500" title="Normal" />
-              <div className="h-full w-[20%] bg-amber-400" title="Overweight" />
-              <div className="h-full w-[40%] bg-red-500" title="Obese" />
-            </div>
-          </div>
+              <div className="mt-2 flex w-full justify-between text-[9px] font-bold uppercase leading-tight tracking-wide text-gray-400 sm:text-[10px]">
+                <span className="w-[14%] max-w-[3.5rem] break-words text-left text-gray-400">
+                  {t('quiz.flow.profile.bandUnderweight')}
+                </span>
+                <span className="w-[26%] text-center text-gray-400">
+                  {t('quiz.flow.profile.bandNormal')}
+                </span>
+                <span className="w-[20%] text-center text-gray-400">
+                  {t('quiz.flow.profile.bandOverweight')}
+                </span>
+                <span className="w-[40%] text-right text-gray-400">{t('quiz.flow.profile.bandObese')}</span>
+              </div>
 
-          {/* Skaičiai po juosta */}
-          <div className="mt-2 flex w-full justify-between text-[11px] font-medium text-gray-500">
-            <span className="w-[14%] text-left">15</span>
-            <span className="w-[26%] text-center">18.5</span>
-            <span className="w-[20%] text-center">25</span>
-            <span className="w-[18%] text-center">30</span>
-            <span className="w-[22%] text-right">40</span>
-          </div>
-
-          {/* Kategorijų etiketės – siauri stulpeliai: leidžiame laužyti eilutę 375px */}
-          <div className="mt-1 flex w-full text-[7px] font-bold uppercase leading-tight tracking-wide text-gray-400 sm:text-[9px]">
-            <span className="w-[14%] break-words text-left">Underweight</span>
-            <span className="w-[26%] break-words text-center">Normal</span>
-            <span className="w-[20%] break-words text-center">Overweight</span>
-            <span className="w-[40%] break-words text-right">Obese</span>
-          </div>
-
-          {bmi && Number(bmi) >= 25 && (
-            <div className="mt-5 flex gap-3 rounded-xl border border-red-100 bg-red-50 px-3 py-3">
-              <WarningCircle
-                size={22}
-                weight="fill"
-                className="mt-0.5 shrink-0 text-red-500"
-                aria-hidden
-              />
-              <p className="text-sm leading-snug text-red-900">
-                <span className="font-semibold">Risks of unhealthy BMI:</span> High blood pressure,
-                chronic back and joint pain
-              </p>
-            </div>
-          )}
-
-          <div className="mt-6 flex flex-col gap-5 border-t border-gray-100 pt-6 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
-            <div className="flex min-w-0 flex-1 flex-col gap-4">
-              <div className="flex gap-3">
-                <Scales size={22} weight="regular" className="mt-0.5 shrink-0 text-gray-400" />
-                <div>
-                  <p className="text-xs text-gray-500">Desired weight</p>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {goalWeight ? `${goalWeight} kg` : '—'}
+              {bmi && Number(bmi) >= 25 && (
+                <div className="mt-6 flex gap-3 rounded-2xl bg-[#fef2f2] px-4 py-3">
+                  <WarningCircle
+                    size={28}
+                    weight="fill"
+                    className="mt-0.5 shrink-0 text-red-500"
+                    aria-hidden
+                  />
+                  <p className="text-sm leading-snug text-[#1a2b3c]">
+                    <span className="font-bold">{t('quiz.flow.profile.riskTitle')}</span>{' '}
+                    {t('quiz.flow.profile.riskBody')}
                   </p>
                 </div>
-              </div>
-              <div className="flex gap-3">
-                <Person size={22} weight="regular" className="mt-0.5 shrink-0 text-gray-400" />
-                <div>
-                  <p className="text-xs text-gray-500">Body dream</p>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {dreamBody ? DREAM_BODY_LABELS[dreamBody] || dreamBody : '—'}
-                  </p>
+              )}
+
+              <div className="mt-8 flex flex-col gap-6 border-t border-gray-100 pt-8 sm:flex-row sm:items-end sm:justify-between sm:gap-8">
+                <div className="flex min-w-0 flex-1 flex-col gap-5">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white">
+                      <Scales size={22} weight="regular" className="text-gray-500" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">{t('quiz.flow.profile.desiredWeight')}</p>
+                      <p className="text-base font-bold text-[#1a2b3c]">
+                        {goalWeight ? `${goalWeight} kg` : '—'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white">
+                      <Person size={22} weight="regular" className="text-gray-500" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">{t('quiz.flow.profile.bodyDream')}</p>
+                      <p className="text-base font-bold text-[#1a2b3c]">
+                        {dreamBody ? dreamBodyLabelFor(dreamBody) : '—'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white">
+                      <Heartbeat size={22} weight="regular" className="text-gray-500" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">{t('quiz.flow.profile.lifestyle')}</p>
+                      <p className="text-base font-bold text-[#1a2b3c]">
+                        {activityLevelAnswer
+                          ? t(`quiz.flow.lifestyle.${activityLevelAnswer}`)
+                          : '—'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="flex gap-3">
-                <Heartbeat size={22} weight="regular" className="mt-0.5 shrink-0 text-gray-400" />
-                <div>
-                  <p className="text-xs text-gray-500">Lifestyle</p>
-                  <p className="text-sm font-semibold text-gray-900">
-                    {activityLevelAnswer
-                      ? ACTIVITY_LABELS[activityLevelAnswer] || activityLevelAnswer
-                      : '—'}
-                  </p>
+
+                <div className="mx-auto flex w-full max-w-[220px] shrink-0 justify-center sm:mx-0 sm:max-w-[260px]">
+                  <img
+                    src={profileCardImageSrc}
+                    alt={profileCardImageAlt}
+                    className="h-auto max-h-[min(52vh,280px)] w-full object-contain object-bottom"
+                    decoding="async"
+                  />
                 </div>
               </div>
             </div>
-
-            <div className="mx-auto flex w-full max-w-[200px] shrink-0 justify-center sm:mx-0 sm:w-[min(42%,220px)]">
-              <img
-                src={figureSrc}
-                alt={figureAlt}
-                className="h-auto max-h-[220px] w-full object-contain object-bottom"
-                decoding="async"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex w-full justify-center px-1">
-          <button
-            type="button"
-            onClick={handleProfileContinue}
-            className={CONTINUE_BUTTON_ALWAYS_ENABLED}
-          >
-            {t('quiz.common.continue')}
-          </button>
-        </div>
       </div>,
       {
         backStep: 42,
-        screenClassName: 'bg-[#ffe8d6]',
-        mainClassName: 'bg-[#ffe8d6]',
+        screenClassName: 'bg-[#f4f5f7]',
+        mainClassName: 'bg-[#f4f5f7]',
+        footer: (
+          <div className="flex justify-center px-1">
+            <button
+              type="button"
+              onClick={handleProfileContinue}
+              className={CONTINUE_BUTTON_ALWAYS_ENABLED}
+            >
+              {t('quiz.common.continue')}
+            </button>
+          </div>
+        ),
       },
     );
   }
@@ -3556,15 +3836,15 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
   // Step 36: Is there any specific event motivating you to lose weight right now?
   if (step === 36) {
     const MOTIVATION_EVENT_OPTIONS = [
-      { id: 'vacation', label: 'Vacation', Icon: Umbrella },
-      { id: 'wedding', label: 'Wedding', Icon: Heart },
-      { id: 'sports_event', label: 'Sports event', Icon: Trophy },
-      { id: 'summer', label: 'Summer', Icon: Sun },
-      { id: 'school_reunion', label: 'School reunion', Icon: Users },
-      { id: 'family_gathering', label: 'Family gathering', Icon: House },
-      { id: 'birthday_party', label: 'Birthday party', Icon: Cake },
-      { id: 'other_occasion', label: 'Other occasion', Icon: Lightbulb },
-      { id: 'no_just_ready', label: 'No — just ready to look and feel my best!', Icon: Sparkle },
+      { id: 'vacation', Icon: Umbrella },
+      { id: 'wedding', Icon: Heart },
+      { id: 'sports_event', Icon: Trophy },
+      { id: 'summer', Icon: Sun },
+      { id: 'school_reunion', Icon: Users },
+      { id: 'family_gathering', Icon: House },
+      { id: 'birthday_party', Icon: Cake },
+      { id: 'other_occasion', Icon: Lightbulb },
+      { id: 'no_just_ready', Icon: Sparkle },
     ];
 
     return renderQuizStepLayout(
@@ -3574,7 +3854,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             <div className="flex items-center justify-center gap-2">
               <HelpCircle size={28} className={QUIZ_ICON_CLASS} />
               <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-                Is there any specific event motivating you to lose weight right now?
+                {t('quiz.flow.motivationEvent.title')}
               </h2>
             </div>
           </div>
@@ -3597,7 +3877,9 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100">
                     <IconComponent size={24} weight="regular" className="text-gray-600" />
                   </span>
-                  <span className="font-medium text-gray-900">{option.label}</span>
+                  <span className="font-medium text-gray-900">
+                    {t(`quiz.flow.motivationEvent.${option.id}`)}
+                  </span>
                 </button>
               );
             })}
@@ -3613,16 +3895,16 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
       <div className="flex w-full max-w-md flex-col gap-8">
         <div className="space-y-2 text-center">
           <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-            Sounds exciting! When is the event?
+            {t('quiz.flow.eventDate.title')}
           </h2>
           <p className="text-sm text-gray-500">
-            We&apos;ll use this information for your personalized plan
+            {t('quiz.flow.eventDate.subtitle')}
           </p>
         </div>
 
         <div className="relative w-full">
           <label htmlFor="motivation-event-date" className="sr-only">
-            Event date
+            {t('quiz.flow.eventDate.eventDateSr')}
           </label>
           <input
             id="motivation-event-date"
@@ -3637,26 +3919,29 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             aria-hidden
           />
         </div>
-
-        <div className="flex flex-col items-center gap-4">
-          <button
-            type="button"
-            onClick={handleEventDateContinue}
-            disabled={!motivationEventDate}
-            className={CONTINUE_BUTTON_CLASSES}
-          >
-            {t('quiz.common.continue')}
-          </button>
-          <button
-            type="button"
-            onClick={handleEventDateSkip}
-            className="text-sm font-medium text-gray-500 underline-offset-2 transition-colors hover:text-gray-800 hover:underline"
-          >
-            Skip this question
-          </button>
-        </div>
       </div>,
-      { backStep: 36 },
+      {
+        backStep: 36,
+        footer: (
+          <div className="flex flex-col items-center gap-4">
+            <button
+              type="button"
+              onClick={handleEventDateContinue}
+              disabled={!motivationEventDate}
+              className={CONTINUE_BUTTON_CLASSES}
+            >
+              {t('quiz.common.continue')}
+            </button>
+            <button
+              type="button"
+              onClick={handleEventDateSkip}
+              className="text-sm font-medium text-gray-500 underline-offset-2 transition-colors hover:text-gray-800 hover:underline"
+            >
+              {t('quiz.flow.common.skipQuestion')}
+            </button>
+          </div>
+        ),
+      },
     );
   }
 
@@ -3669,12 +3954,12 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
     const targetDate = new Date();
     targetDate.setDate(targetDate.getDate() + Math.ceil((weightDiff / 0.5) * 7));
 
-    const formatTargetDate = (d) => {
-      const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-      return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
-    };
+    const locale = i18n.language || undefined;
+    const formatTargetDate = (d) =>
+      d.toLocaleDateString(locale, { month: 'long', day: 'numeric', year: 'numeric' });
 
     const today = new Date();
+
     const graphMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
     const graphMonthEnd = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
 
@@ -3714,7 +3999,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
 
     const formatGraphXTick = (d, i, arr) => {
       const isLast = i === arr.length - 1;
-      const short = d.toLocaleString('en-US', { month: 'short' });
+      const short = d.toLocaleDateString(locale, { month: 'short' });
       if (isLast) {
         const sameMonthYearAsFirst =
           arr.length >= 2 &&
@@ -3728,18 +4013,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
       return short;
     };
 
-    const tickFontSize = monthTicks.length > 6 ? 9 : 11;
-
-    const MOTIVATION_EVENT_LABELS = {
-      vacation: 'Vacation',
-      wedding: 'Wedding',
-      sports_event: 'Sports event',
-      summer: 'Summer',
-      school_reunion: 'School reunion',
-      family_gathering: 'Family gathering',
-      birthday_party: 'Birthday party',
-      other_occasion: 'Other occasion',
-    };
+    const tickFontSize = monthTicks.length > 6 ? 12 : 14;
 
     let eventPillText = null;
     if (
@@ -3747,7 +4021,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
       motivationEventAnswer !== 'no_just_ready' &&
       motivationEventDate
     ) {
-      const label = MOTIVATION_EVENT_LABELS[motivationEventAnswer];
+      const label = t(`quiz.flow.motivationEvent.${motivationEventAnswer}`);
       const parts = motivationEventDate.split('-');
       if (label && parts.length === 3) {
         const y = Number(parts[0]);
@@ -3755,27 +4029,53 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
         const da = Number(parts[2]);
         const eventD = new Date(y, mo - 1, da);
         if (!Number.isNaN(eventD.getTime())) {
-          const monthName = eventD.toLocaleString('en-US', { month: 'long' });
+          const monthName = eventD.toLocaleDateString(locale, { month: 'long' });
           const dayStr = String(da).padStart(2, '0');
           eventPillText = `${label} · ${monthName} ${dayStr}`;
         }
       }
     }
 
-    const gradLineId = 'weightLineGradientStep37';
-    const gradFillId = 'graphFillGradientStep37';
+    const gradLineId = 'predictionChartLineGrad';
+    const gradFillId = 'predictionChartFillGrad';
+
     /** Reference: šviesus kremas centre (~#FFFBF5), persikas į kraštus */
     const predictionScreenBg =
       'bg-[radial-gradient(circle_at_50%_38%,#FFFBF5_0%,#FFE8CC_55%,#FFD8A8_100%)]';
 
+    const startDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const targetDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+    const daysToGoal = Math.max(1, Math.round((targetDay - startDay) / 86400000));
+    const weeklyLossKg = weightDiff > 0 ? (weightDiff / daysToGoal) * 7 : 0;
+    const rateStr = weeklyLossKg.toLocaleString(locale || undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+    const seasonId = getSeasonIdForQuizPrediction(targetDate);
+
     return renderQuizStepLayout(
       <div className="flex w-full max-w-lg flex-col gap-6">
-        <h2 className="text-center text-2xl font-bold text-gray-900 md:text-3xl">
-          You can reach{' '}
-          <span className="text-orange-500">{targetWeight} kg</span>
-          {' '}by{' '}
-          <span className="text-orange-500">{formatTargetDate(targetDate)}</span>
-        </h2>
+        <div className="flex flex-col gap-3">
+          <h2 className="text-center text-2xl font-bold text-gray-900 md:text-3xl">
+            {t('quiz.flow.prediction.titleYouCan')}{' '}
+            <span className="text-orange-500">{targetWeight} kg</span>
+            {' '}
+            {t('quiz.flow.prediction.titleBy')}{' '}
+            <span className="text-orange-500">{formatTargetDate(targetDate)}</span>
+          </h2>
+          {weightDiff > 0 && weeklyLossKg > 0 && (
+            <div className="mx-auto w-full max-w-md rounded-full border border-gray-100 bg-white px-4 py-2.5 text-center text-sm leading-snug text-gray-900 shadow-sm">
+              <Trans
+                i18nKey="quiz.flow.prediction.subPillRich"
+                values={{
+                  rate: rateStr,
+                  seasonName: t(`quiz.flow.prediction.season.${seasonId}`),
+                }}
+                components={{ season: <strong className="font-bold text-gray-900" /> }}
+              />
+            </div>
+          )}
+        </div>
 
         <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-md">
           {eventPillText && (
@@ -3784,10 +4084,14 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             </div>
           )}
           <svg
-            viewBox="0 0 400 188"
-            className="h-48 w-full"
+            viewBox="0 0 400 218"
+            className="h-auto w-full max-h-[min(56vh,280px)] min-h-[200px]"
             preserveAspectRatio="xMidYMid meet"
-            aria-hidden
+            role="img"
+            aria-label={t('quiz.flow.prediction.chartAria', {
+              from: startWeight,
+              to: targetWeight,
+            })}
           >
             <defs>
               <linearGradient id={gradLineId} x1="0%" y1="0%" x2="100%" y2="0%">
@@ -3796,87 +4100,117 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                 <stop offset="66%" stopColor="#eab308" />
                 <stop offset="100%" stopColor="#22c55e" />
               </linearGradient>
-              {/* Horizontalus užpildas: raudona / oranžinė → geltona → žalia (matomas po kreive) */}
               <linearGradient id={gradFillId} x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#fca5a5" stopOpacity="0.55" />
-                <stop offset="28%" stopColor="#fdba74" stopOpacity="0.5" />
-                <stop offset="55%" stopColor="#fde047" stopOpacity="0.4" />
-                <stop offset="100%" stopColor="#86efac" stopOpacity="0.55" />
+                <stop offset="0%" stopColor="#fca5a5" stopOpacity="0.5" />
+                <stop offset="28%" stopColor="#fdba74" stopOpacity="0.45" />
+                <stop offset="55%" stopColor="#fde047" stopOpacity="0.35" />
+                <stop offset="100%" stopColor="#86efac" stopOpacity="0.5" />
               </linearGradient>
             </defs>
-            {/* Grid lines */}
             {[0, 1, 2, 3, 4].map((i) => (
               <line
                 key={i}
                 x1="50"
-                y1={40 + i * 30}
+                y1={48 + i * 30}
                 x2="350"
-                y2={40 + i * 30}
+                y2={48 + i * 30}
                 stroke="#e5e7eb"
                 strokeWidth="1"
                 strokeDasharray="4 4"
               />
             ))}
-            {/* Gradient fill under line */}
             <path
-              d="M 50 50 Q 150 70 250 100 Q 320 125 350 130 L 350 160 L 50 160 Z"
+              d="M 50 52 Q 150 72 250 102 Q 320 127 350 132 L 350 168 L 50 168 Z"
               fill={`url(#${gradFillId})`}
             />
-            {/* Weight line */}
             <path
-              d="M 50 50 Q 150 70 250 100 Q 320 125 350 130"
+              d="M 50 52 Q 150 72 250 102 Q 320 127 350 132"
               fill="none"
               stroke={`url(#${gradLineId})`}
               strokeWidth="4"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
-            {/* Start dot + callout */}
-            <circle cx="50" cy="50" r="6" fill="#ef4444" />
-            <rect x="20" y="25" width="50" height="22" rx="4" fill="#ef4444" />
-            <text x="45" y="41" fontSize="11" fill="white" fontWeight="bold" textAnchor="middle">
-              {startWeight} kg
-            </text>
-            {/* End dot + callout */}
-            <circle cx="350" cy="130" r="6" fill="#22c55e" />
-            <rect x="295" y="115" width="55" height="22" rx="4" fill="#22c55e" />
-            <text x="322" y="131" fontSize="11" fill="white" fontWeight="bold" textAnchor="middle">
-              {targetWeight} kg
-            </text>
-            {/* X-axis: visi mėnesiai nuo šio mėnesio iki tikslo mėnesio */}
+            {/* Pradžia: burbuliukas + taškas (taškas ant kreivės 50,52) */}
+            <g>
+              <rect x="8" y="8" width="74" height="34" rx="9" fill="#ef4444" />
+              <polygon points="38,42 62,42 50,52" fill="#ef4444" />
+              <text
+                x="45"
+                y="25"
+                fontSize="15"
+                fill="white"
+                fontWeight="bold"
+                textAnchor="middle"
+                dominantBaseline="central"
+              >
+                {startWeight} kg
+              </text>
+              <circle cx="50" cy="52" r="7" fill="#ef4444" />
+            </g>
+            {/* Pabaiga: burbuliukas + taškas (taškas ant kreivės 350,132) */}
+            <g>
+              <rect x="286" y="86" width="88" height="34" rx="9" fill="#22c55e" />
+              <polygon points="328,120 372,120 350,132" fill="#22c55e" />
+              <text
+                x="330"
+                y="103"
+                fontSize="15"
+                fill="white"
+                fontWeight="bold"
+                textAnchor="middle"
+                dominantBaseline="central"
+              >
+                {targetWeight} kg
+              </text>
+              <circle cx="350" cy="132" r="7" fill="#22c55e" />
+            </g>
             {monthTicks.map((tickDate, i) => (
               <text
                 key={`${tickDate.getTime()}-${i}`}
                 x={monthTickXs[i]}
-                y="182"
+                y="206"
                 fontSize={tickFontSize}
                 fill={i === monthTicks.length - 1 ? '#16a34a' : '#6b7280'}
-                fontWeight={i === monthTicks.length - 1 ? '600' : '400'}
+                fontWeight={i === monthTicks.length - 1 ? '600' : '500'}
                 textAnchor="middle"
               >
                 {formatGraphXTick(tickDate, i, monthTicks)}
               </text>
             ))}
           </svg>
+          <p className="mt-3 text-center text-xs text-gray-600 sm:text-sm">
+            <span className="font-semibold tabular-nums text-gray-800">{startWeight} kg</span>
+            <span className="mx-1.5 text-gray-400" aria-hidden>
+              →
+            </span>
+            <span className="font-semibold tabular-nums text-green-700">{targetWeight} kg</span>
+            {weightDiff > 0 ? (
+              <span className="ml-2 text-gray-500">
+                ({t('quiz.flow.prediction.weightLossTotal', { kg: weightDiff })})
+              </span>
+            ) : null}
+          </p>
         </div>
 
         <p className="text-center text-sm text-gray-500">
-          Based on data from Walking members with similar profiles
+          {t('quiz.flow.prediction.basedOn')}
         </p>
-
-        <div className="flex justify-center">
-          <button
-            type="button"
-            onClick={handlePredictionContinue}
-            className={CONTINUE_BUTTON_ALWAYS_ENABLED}
-          >{t('quiz.common.continue')}
-        </button>
-        </div>
       </div>,
       {
         backStep: motivationEventAnswer === 'no_just_ready' ? 36 : 47,
         screenClassName: predictionScreenBg,
         mainClassName: predictionScreenBg,
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handlePredictionContinue}
+              className={CONTINUE_BUTTON_ALWAYS_ENABLED}
+            >{t('quiz.common.continue')}
+          </button>
+          </div>
+        ),
       },
     );
   }
@@ -3889,40 +4223,28 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
     const targetDate = new Date();
     targetDate.setDate(targetDate.getDate() + Math.ceil((weightDiff / 0.5) * 7));
 
-    const formatTargetDate = (d) => {
-      const months = [
-        'January',
-        'February',
-        'March',
-        'April',
-        'May',
-        'June',
-        'July',
-        'August',
-        'September',
-        'October',
-        'November',
-        'December',
-      ];
-      return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
-    };
+    const locale = i18n.language || undefined;
+    const formatTargetDate = (d) =>
+      d.toLocaleDateString(locale, { month: 'long', day: 'numeric', year: 'numeric' });
 
     const REACH_CONFIDENCE_OPTIONS = [
-      { id: 'believe', label: 'I believe I can do it!', Icon: LucideTrophy },
-      { id: 'uncertain_try', label: "I'm uncertain, but willing to try!", Icon: Dumbbell },
-      { id: 'not_sure', label: "I'm not really sure", Icon: Meh },
+      { id: 'believe', Icon: LucideTrophy },
+      { id: 'uncertain_try', Icon: Dumbbell },
+      { id: 'not_sure', Icon: Meh },
     ];
 
     return renderQuizStepLayout(
       <div className="flex w-full max-w-md flex-col gap-8">
         <h2 className="text-center text-2xl font-bold leading-snug text-gray-900 md:text-3xl">
-          How confident are you in reaching{' '}
-          <span className="text-orange-500">{targetWeight} kg</span> by{' '}
-          <span className="text-orange-500">{formatTargetDate(targetDate)}</span>?
+          {t('quiz.flow.reachConfidence.titleBefore')}{' '}
+          <span className="text-orange-500">{targetWeight} kg</span>{' '}
+          {t('quiz.flow.reachConfidence.titleMid')}{' '}
+          <span className="text-orange-500">{formatTargetDate(targetDate)}</span>
+          {t('quiz.flow.reachConfidence.titleAfter')}
         </h2>
 
         <div className="flex flex-col gap-3">
-          {REACH_CONFIDENCE_OPTIONS.map(({ id, label, Icon }) => {
+          {REACH_CONFIDENCE_OPTIONS.map(({ id, Icon }) => {
             const isSelected = reachConfidenceAnswer === id;
             return (
               <button
@@ -3938,7 +4260,9 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100">
                   <Icon size={22} className="text-gray-700" strokeWidth={2} />
                 </span>
-                <span className="font-semibold text-gray-900">{label}</span>
+                <span className="font-semibold text-gray-900">
+                  {t(`quiz.flow.reachConfidence.${id}`)}
+                </span>
               </button>
             );
           })}
@@ -3948,47 +4272,52 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
     );
   }
 
-  // Step 49: Visa ekrano nuotrauka, tekstas apačioje ant jos (po Step 48)
+  // Step 49: Kompaktiškas hero + baltas tekstas (tel.) – visa nuotrauka nebeužima beveik viso aukščio
   if (step === 49) {
     return renderQuizStepLayout(
-      <div className="relative flex min-h-[calc(100vh-100px)] w-full items-end justify-center overflow-hidden">
-        <img
-          src={seniorCoupleHeroImage}
-          alt="Active older couple smiling after walking, with towels and water bottles"
-          className="absolute inset-0 h-full w-full object-cover object-[center_25%]"
-          loading="eager"
-          decoding="async"
-        />
-        <div
-          className="absolute inset-0 bg-gradient-to-b from-black/25 via-black/15 to-black/70"
-          aria-hidden
-        />
+      <div className="flex min-h-0 w-full flex-1 flex-col bg-white">
+        <div className="relative h-[min(26dvh,11.5rem)] w-full shrink-0 overflow-hidden sm:h-[min(30dvh,13.5rem)] md:h-[min(34dvh,15rem)]">
+          <img
+            src={seniorCoupleHeroImage}
+            alt={t('quiz.flow.seniorCoupleAlt')}
+            className="h-full w-full object-cover object-[center_28%]"
+            loading="eager"
+            decoding="async"
+          />
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-b from-transparent via-white/55 to-white sm:h-12"
+            aria-hidden
+          />
+        </div>
 
-        <div className="relative z-10 mx-auto flex w-full max-w-lg flex-col items-center gap-5 px-6 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6 text-center md:gap-6 md:pb-12">
-          <h2 className="text-balance text-xl font-bold leading-snug text-white drop-shadow-md md:text-2xl">
-            Why do people give up on their get-in-shape efforts?
+        <div className="mx-auto flex w-full max-w-lg min-w-0 flex-1 flex-col items-center gap-3 px-5 pb-2 pt-3 text-center sm:gap-4 sm:px-6 sm:pb-3 sm:pt-4 md:gap-5">
+          <h2 className="text-balance text-lg font-bold leading-snug text-gray-900 sm:text-xl md:text-2xl">
+            {t('quiz.flow.giveUp.title')}
           </h2>
-          <p className="text-balance text-[11px] font-bold uppercase leading-snug tracking-wide text-white drop-shadow-sm sm:text-xs md:text-sm">
-            The <span className="text-[#ff6b4a] drop-shadow-sm">#1 reason</span> is starting too big
-            too quickly.
+          <p className="text-balance text-[10px] font-bold uppercase leading-snug tracking-wide text-gray-900 sm:text-xs md:text-sm">
+            {t('quiz.flow.giveUp.line1')}{' '}
+            <span className="text-[#ff6b4a]">{t('quiz.flow.giveUp.reasonHash')}</span>{' '}
+            {t('quiz.flow.giveUp.line2')}
           </p>
-          <p className="text-pretty text-sm leading-relaxed text-white/90 drop-shadow-sm md:text-base">
-            That&apos;s why our program aims to help you make sustainable lifestyle changes so you
-            can transform your body and enjoy thriving health for life.
+          <p className="text-pretty text-sm leading-relaxed text-gray-600 sm:text-base">
+            {t('quiz.flow.giveUp.body')}
           </p>
-          <button
-            type="button"
-            onClick={handleSustainableChangeGotIt}
-            className="mt-2 w-full max-w-[min(100%,20rem)] rounded-full bg-[#ff6b4a] px-6 py-3.5 text-base font-semibold text-white shadow-lg transition-colors hover:bg-[#f05538] active:scale-[0.98] sm:w-auto sm:max-w-none sm:px-10 md:px-12"
-          >
-            Got it
-          </button>
         </div>
       </div>,
       {
         backStep: 48,
-        mainClassName:
-          '!items-stretch !justify-center !p-0 !px-0 !pb-0 !pt-0 !overflow-hidden',
+        mainClassName: '!items-stretch !justify-start !p-0 !px-0 !pb-0 !pt-0',
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleSustainableChangeGotIt}
+              className="w-full max-w-[min(100%,20rem)] rounded-full bg-[#ff6b4a] px-6 py-3.5 text-base font-semibold text-white shadow-lg transition-colors hover:bg-[#f05538] active:scale-[0.98] sm:mx-auto sm:w-auto sm:max-w-none sm:px-10 md:px-12"
+            >
+              {t('quiz.flow.common.gotIt')}
+            </button>
+          </div>
+        ),
       },
     );
   }
@@ -4003,10 +4332,10 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
         <div className="space-y-6">
           <div className="space-y-2 text-center">
             <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-              Get your personalized program
+              {t('quiz.flow.emailStep.title38')}
             </h2>
             <p className="text-sm text-gray-500">
-              Enter your email to receive your custom Tai Chi Walking plan
+              {t('quiz.flow.emailStep.subtitle38')}
             </p>
           </div>
 
@@ -4015,14 +4344,14 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
               htmlFor="quiz-email-step-38"
               className="mb-1.5 block text-left text-xs font-medium text-gray-400"
             >
-              Email
+              {t('quiz.flow.common.email')}
             </label>
             <input
               id="quiz-email-step-38"
               type="email"
               inputMode="email"
               autoComplete="email"
-              placeholder="your@email.com"
+              placeholder={t('quiz.flow.emailStep.placeholder38')}
               value={emailForPlan}
               onChange={(e) => setEmailForPlan(e.target.value)}
               aria-invalid={showEmailError}
@@ -4044,7 +4373,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                 role="alert"
               >
                 <WarningCircle size={18} weight="fill" className="shrink-0 text-orange-500" />
-                Please enter a valid email address.
+                {t('quiz.flow.emailStep.invalidEmail')}
               </p>
             )}
             {valid && (
@@ -4053,23 +4382,26 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                 className="mt-2 flex items-center gap-1.5 text-sm font-medium text-green-600"
               >
                 <CheckCircle size={18} className="shrink-0 text-green-600" strokeWidth={2.5} />
-                Email address looks good.
+                {t('quiz.flow.emailStep.emailOk')}
               </p>
             )}
           </div>
         </div>
-
-        <div className="mt-8 flex justify-center border-t border-gray-200 pt-6">
-          <button
-            type="button"
-            onClick={handleGetPlanContinue}
-            disabled={!valid}
-            className={CONTINUE_BUTTON_CLASSES}
-          >{t('quiz.common.continue')}
-        </button>
-        </div>
       </div>,
-      { backStep: 49 },
+      {
+        backStep: 49,
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleGetPlanContinue}
+              disabled={!valid}
+              className={CONTINUE_BUTTON_CLASSES}
+            >{t('quiz.common.continue')}
+          </button>
+          </div>
+        ),
+      },
     );
   }
 
@@ -4081,43 +4413,50 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
           <CheckCircle size={48} className="text-green-600" strokeWidth={2} />
         </div>
         <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-          Check your inbox!
+          {t('quiz.flow.inbox.title')}
         </h2>
         <p className="text-gray-600">
-          We&apos;ve sent your personalized Tai Chi Walking plan to{' '}
-          <strong>{emailForPlan || 'your email'}</strong>. Follow the steps to start
-          your transformation today!
+          {t('quiz.flow.inbox.body')}{' '}
+          <strong>{emailForPlan || t('quiz.flow.common.yourEmailFallback')}</strong>.{' '}
+          {t('quiz.flow.inbox.bodyEnd')}
         </p>
-        <button
-          type="button"
-          onClick={handleFinalContinue}
-          className={CONTINUE_BUTTON_ALWAYS_ENABLED}
-        >
-          Got it!
-        </button>
-      </div>
+      </div>,
+      {
+        backStep: 38,
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleFinalContinue}
+              className={CONTINUE_BUTTON_ALWAYS_ENABLED}
+            >
+              {t('quiz.flow.common.gotItExclaim')}
+            </button>
+          </div>
+        ),
+      },
     );
   }
 
   // Step 40: After reaching your goal weight, how would you reward yourself? (po Step 49)
   if (step === 40) {
     const REWARD_OPTIONS = [
-      { id: 'new_clothes', label: 'Buying new clothes', Icon: TShirt },
-      { id: 'personal_day', label: 'Take a personal day', Icon: Armchair },
+      { id: 'new_clothes', Icon: TShirt },
+      { id: 'personal_day', Icon: Armchair },
       {
         id: 'social_media',
-        label: 'Sharing it on the social media',
         Icon: ImageLandscapeIcon,
       },
-      { id: 'pictures', label: 'Taking pictures of myself', Icon: DeviceMobile },
-      { id: 'travel', label: 'Traveling somewhere new', Icon: Suitcase },
+      { id: 'pictures', Icon: DeviceMobile },
+      { id: 'travel', Icon: Suitcase },
     ];
 
     return renderQuizStepLayout(
       <div className="flex w-full max-w-md flex-col gap-8">
         <h2 className="text-balance text-center text-2xl font-bold leading-snug text-gray-900 md:text-3xl">
-          After reaching your goal weight, how would you{' '}
-          <span className="text-orange-500">reward yourself</span>?
+          {t('quiz.flow.reward.titleBefore')}{' '}
+          <span className="text-orange-500">{t('quiz.flow.reward.titleAccent')}</span>
+          {t('quiz.flow.reward.titleAfter')}
         </h2>
 
         <div className="flex flex-col gap-3">
@@ -4139,7 +4478,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                   <IconComponent size={24} weight="regular" className="text-gray-600" />
                 </span>
                 <span className="min-w-0 flex-1 text-center font-semibold text-gray-900">
-                  {option.label}
+                  {t(`quiz.flow.reward.${option.id}`)}
                 </span>
               </button>
             );
@@ -4153,18 +4492,19 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
   // Step 41: How would you see yourself after reaching your goal weight?
   if (step === 41) {
     const SEE_YOURSELF_OPTIONS = [
-      { id: 'proud', label: 'Being proud of myself', Icon: Trophy },
-      { id: 'feeling_great', label: 'Feeling great', Icon: SmileyWink },
-      { id: 'believe', label: 'Believe in myself', Icon: Smile },
-      { id: 'empowered', label: 'Feel empowered to make healthy choices', Icon: Lightning },
-      { id: 'worry_less', label: 'Worry less about my body overall', Icon: ThumbsUp },
+      { id: 'proud', Icon: Trophy },
+      { id: 'feeling_great', Icon: SmileyWink },
+      { id: 'believe', Icon: Smile },
+      { id: 'empowered', Icon: Lightning },
+      { id: 'worry_less', Icon: ThumbsUp },
     ];
 
     return renderQuizStepLayout(
       <div className="flex w-full max-w-md flex-col gap-8">
         <h2 className="text-balance text-center text-2xl font-bold leading-snug text-gray-900 md:text-3xl">
-          How would you <span className="text-orange-500">see yourself</span> after reaching your
-          goal weight?
+          {t('quiz.flow.seeYourself.titleBefore')}{' '}
+          <span className="text-orange-500">{t('quiz.flow.seeYourself.titleAccent')}</span>{' '}
+          {t('quiz.flow.seeYourself.titleAfter')}
         </h2>
 
         <div className="flex flex-col gap-3">
@@ -4186,7 +4526,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                   <IconComponent size={24} weight="regular" className="text-gray-600" />
                 </span>
                 <span className="min-w-0 flex-1 text-center font-semibold text-gray-900">
-                  {option.label}
+                  {t(`quiz.flow.seeYourself.${option.id}`)}
                 </span>
               </button>
             );
@@ -4234,21 +4574,21 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
           </span>
         </div>
         <p className="text-center text-sm text-gray-600">
-          Creating your personalized Walking Plan
+          {t('quiz.flow.planBuild.creating')}
         </p>
         <p className="text-center">
-          <span className="text-2xl font-bold text-[#e07a4f]">10 million people</span>
-          <span className="text-gray-900"> have chosen Walking</span>
+          <span className="text-2xl font-bold text-[#e07a4f]">{t('quiz.flow.planBuild.million')}</span>
+          <span className="text-gray-900">{t('quiz.flow.planBuild.chosen')}</span>
         </p>
         <div className="w-full overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <img
               src={RACHEL_IMAGE}
-              alt="Rachel"
+              alt={t('quiz.flow.planBuild.rachelAlt')}
               className="h-14 w-14 rounded-full object-cover"
             />
             <div>
-              <p className="font-semibold text-gray-900">Rachel999</p>
+              <p className="font-semibold text-gray-900">{t('quiz.flow.planBuild.rachelUser')}</p>
               <div className="flex gap-0.5">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <Star key={i} size={16} weight="fill" className="text-amber-400" />
@@ -4257,86 +4597,9 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             </div>
           </div>
           <p className="mt-3 text-sm text-gray-600 italic">
-            &quot;Lost 4 lbs in one week. It looks easy, but it is a super calorie burner
-            workout. Walking helps me to be more active, healthy, and happy!&quot;
+            &quot;{t('quiz.flow.planBuild.rachelQuote')}&quot;
           </p>
         </div>
-      </div>,
-      {
-        backStep: 41,
-        mainClassName: '!justify-center !pt-6',
-        screenClassName: 'bg-[#f9f8f6]',
-      },
-    );
-  }
-
-  // Step 44: 100 % + social proof + Continue (po Step 43 animacijos)
-  if (step === 44) {
-    const RACHEL_IMAGE = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=80&q=80';
-
-    return renderQuizStepLayout(
-      <div className="flex w-full max-w-md flex-col items-center gap-6">
-        <div className="relative">
-          <svg className="h-32 w-32" viewBox="0 0 100 100" aria-hidden>
-            <circle
-              cx="50"
-              cy="50"
-              r={PLAN_BUILD_CIRCLE_R}
-              fill="none"
-              stroke="#e5e7eb"
-              strokeWidth="8"
-            />
-            <circle
-              cx="50"
-              cy="50"
-              r={PLAN_BUILD_CIRCLE_R}
-              fill="none"
-              stroke="#f97316"
-              strokeWidth="8"
-              strokeDasharray={PLAN_BUILD_CIRCUMFERENCE}
-              strokeDashoffset={0}
-              strokeLinecap="round"
-              transform="rotate(-90 50 50)"
-            />
-          </svg>
-          <span className="absolute inset-0 flex items-center justify-center text-2xl font-bold text-orange-500">
-            100%
-          </span>
-        </div>
-        <p className="text-center text-sm text-gray-600">
-          Creating your personalized Walking Plan
-        </p>
-        <p className="text-center">
-          <span className="text-2xl font-bold text-[#e07a4f]">10 million people</span>
-          <span className="text-gray-900"> have chosen Walking</span>
-        </p>
-        <div className="w-full overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <img
-              src={RACHEL_IMAGE}
-              alt="Rachel"
-              className="h-14 w-14 rounded-full object-cover"
-            />
-            <div>
-              <p className="font-semibold text-gray-900">Rachel999</p>
-              <div className="flex gap-0.5">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <Star key={i} size={16} weight="fill" className="text-amber-400" />
-                ))}
-              </div>
-            </div>
-          </div>
-          <p className="mt-3 text-sm text-gray-600 italic">
-            &quot;Lost 4 lbs in one week. It looks easy, but it is a super calorie burner
-            workout. Walking helps me to be more active, healthy, and happy!&quot;
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={handleCompletionContinue}
-          className={CONTINUE_BUTTON_ALWAYS_ENABLED}
-        >{t('quiz.common.continue')}
-      </button>
       </div>,
       {
         backStep: 41,
@@ -4356,8 +4619,8 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
         <div className="space-y-6">
           <div className="space-y-2 text-center">
             <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-              Enter email to get your{' '}
-              <span className="text-orange-500">Tai Chi Walking Plan</span>
+              {t('quiz.flow.emailStep.title45a')}{' '}
+              <span className="text-orange-500">{t('quiz.flow.emailStep.title45b')}</span>
             </h2>
           </div>
 
@@ -4366,14 +4629,14 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
               htmlFor="quiz-email-step-45"
               className="mb-1.5 block text-left text-xs font-medium text-gray-400"
             >
-              Email
+              {t('quiz.flow.common.email')}
             </label>
             <input
               id="quiz-email-step-45"
               type="email"
               inputMode="email"
               autoComplete="email"
-              placeholder="Email"
+              placeholder={t('quiz.flow.emailStep.placeholder45')}
               value={emailForPlan}
               onChange={(e) => setEmailForPlan(e.target.value)}
               aria-invalid={showEmailError}
@@ -4395,7 +4658,7 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                 role="alert"
               >
                 <WarningCircle size={18} weight="fill" className="shrink-0 text-orange-500" />
-                Please enter a valid email address.
+                {t('quiz.flow.emailStep.invalidEmail')}
               </p>
             )}
             {valid && (
@@ -4404,31 +4667,31 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
                 className="mt-2 flex items-center gap-1.5 text-sm font-medium text-green-600"
               >
                 <CheckCircle size={18} className="shrink-0 text-green-600" strokeWidth={2.5} />
-                Email address looks good.
+                {t('quiz.flow.emailStep.emailOk')}
               </p>
             )}
           </div>
 
           <div className="flex items-start gap-2 text-sm text-gray-500">
             <Lock size={18} weight="regular" className="mt-0.5 shrink-0 text-gray-400" />
-            <p>
-              We respect your privacy and are committed to protecting your personal data.
-              We&apos;ll email you a copy of your results for convenient access.
-            </p>
+            <p>{t('quiz.flow.emailStep.privacy')}</p>
           </div>
         </div>
-
-        <div className="mt-8 flex justify-center border-t border-gray-200 pt-6">
-          <button
-            type="button"
-            onClick={handleTaiChiPlanEmailContinue}
-            disabled={!valid}
-            className={CONTINUE_BUTTON_CLASSES}
-          >{t('quiz.common.continue')}
-        </button>
-        </div>
       </div>,
-      { backStep: 44 },
+      {
+        backStep: 41,
+        footer: (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={handleTaiChiPlanEmailContinue}
+              disabled={!valid}
+              className={CONTINUE_BUTTON_CLASSES}
+            >{t('quiz.common.continue')}
+          </button>
+          </div>
+        ),
+      },
     );
   }
 
@@ -4436,32 +4699,36 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
   if (step === 46) {
     const OPT_IN_CORAL = '#F16E43';
     return renderQuizStepLayout(
-      <div className="flex w-full max-w-md flex-col justify-between gap-10 min-h-[min(480px,calc(100vh-12rem))] md:min-h-[min(560px,calc(100vh-11rem))]">
+      <div className="flex w-full max-w-md flex-col gap-8">
         <h2 className="text-balance text-center text-2xl font-bold leading-snug text-gray-900 md:text-3xl">
-          Do you want to receive emails with{' '}
-          <span style={{ color: OPT_IN_CORAL }}>Weight Loss</span>
-          {' '}tips and our app updates?
+          {t('quiz.flow.optIn.titleBefore')}{' '}
+          <span style={{ color: OPT_IN_CORAL }}>{t('quiz.flow.optIn.titleAccent')}</span>
+          {t('quiz.flow.optIn.titleAfter')}
         </h2>
-
-        <div className="flex flex-col items-center gap-5 pb-2">
-          <button
-            type="button"
-            onClick={() => handleEmailOptInSelect('yes')}
-            className="w-full rounded-full px-8 py-4 text-center text-base font-bold text-white shadow-md transition-all hover:brightness-95 active:scale-[0.98]"
-            style={{ backgroundColor: OPT_IN_CORAL }}
-          >
-            Yes, I do
-          </button>
-          <button
-            type="button"
-            onClick={() => handleEmailOptInSelect('no')}
-            className="max-w-xs text-center text-[10px] font-semibold uppercase leading-relaxed tracking-wide text-gray-400 underline-offset-4 transition-colors hover:text-gray-600 hover:underline"
-          >
-            I don&apos;t want to receive tips or updates
-          </button>
-        </div>
       </div>,
-      { backStep: 45, mainClassName: '!justify-center md:!pt-8' },
+      {
+        backStep: 45,
+        mainClassName: '!justify-center md:!pt-8',
+        footer: (
+          <div className="flex flex-col items-center gap-5">
+            <button
+              type="button"
+              onClick={() => handleEmailOptInSelect('yes')}
+              className="w-full rounded-full px-8 py-4 text-center text-base font-bold text-white shadow-md transition-all hover:brightness-95 active:scale-[0.98]"
+              style={{ backgroundColor: OPT_IN_CORAL }}
+            >
+              {t('quiz.flow.optIn.yes')}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleEmailOptInSelect('no')}
+              className="max-w-xs text-center text-[10px] font-semibold uppercase leading-relaxed tracking-wide text-gray-400 underline-offset-4 transition-colors hover:text-gray-600 hover:underline"
+            >
+              {t('quiz.flow.optIn.no')}
+            </button>
+          </div>
+        ),
+      },
     );
   }
 
@@ -4472,27 +4739,32 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
     return renderQuizStepLayout(
       <div className="flex w-full max-w-md flex-col gap-8">
         <div className="space-y-3 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">What&apos;s your name?</h2>
+          <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">{t('quiz.flow.nameStep.title')}</h2>
           <p className="text-sm leading-relaxed text-gray-500">
-            Let us know your name, so we can address you the way you like
+            {t('quiz.flow.nameStep.subtitle')}
           </p>
         </div>
 
         <div className="space-y-6">
           <label htmlFor="quiz-user-name" className="sr-only">
-            Your name
+            {t('quiz.flow.nameStep.nameSr')}
           </label>
           <input
             id="quiz-user-name"
             type="text"
             name="name"
             autoComplete="name"
-            placeholder="Name"
+            placeholder={t('quiz.flow.nameStep.placeholder')}
             value={quizUserName}
             onChange={(e) => setQuizUserName(e.target.value)}
             className="w-full rounded-xl border border-gray-200 bg-white px-4 py-4 text-lg text-gray-900 shadow-sm outline-none transition-all placeholder:text-gray-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
           />
-
+        </div>
+      </div>,
+      {
+        backStep: 46,
+        mainClassName: '!justify-center',
+        footer: (
           <button
             type="button"
             onClick={handleQuizNameContinue}
@@ -4500,9 +4772,8 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
             className={`${CONTINUE_BUTTON_CLASSES} w-full`}
           >{t('quiz.common.continue')}
         </button>
-        </div>
-      </div>,
-      { backStep: 46, mainClassName: '!justify-center' },
+        ),
+      },
     );
   }
 
@@ -4515,19 +4786,28 @@ function Quiz({ initialStep = 1, initialGender = '', initialSelectedGoals = [] }
           {firstName ? tLegacy('thankYouNamed', { firstName }) : tLegacy('thankYouPlain')}
         </h2>
         <p className="mb-8 text-gray-600">{tLegacy('quizComplete')}</p>
-        <button
-          type="button"
-          onClick={() => setStep(52)}
-          className={CONTINUE_BUTTON_ALWAYS_ENABLED + ' w-full max-w-sm'}
-        >
-          {tOffer('getMyPlan')}
-        </button>
       </div>,
-      { backStep: emailOptInAnswer === 'yes' ? 50 : 46 },
+      {
+        backStep: emailOptInAnswer === 'yes' ? 50 : 46,
+        footer: (
+          <button
+            type="button"
+            onClick={() => setStep(52)}
+            className={CONTINUE_BUTTON_ALWAYS_ENABLED + ' w-full max-w-sm'}
+          >
+            {tOffer('getMyPlan')}
+          </button>
+        ),
+      },
     );
   }
 
-  return null;
+  /* Nepažįstamas žingsnis (pvz. senas būsena) – nerodyti tuščio balto ekrano */
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-white px-6 text-center">
+      <p className="text-sm text-gray-600">{t('common.redirecting')}</p>
+    </div>
+  );
 }
 
 export default Quiz;

@@ -63,7 +63,10 @@
     "offerMissing": "Offer configuration missing for this path.",
     "noPlans": "No plan options configured.",
     "switchToEn": "English",
-    "switchToLt": "Lietuvių"
+    "switchToLt": "Lietuvių",
+    "switchToRu": "Русский",
+    "restartQuiz": "Restart quiz from the beginning",
+    "restartQuizConfirm": "Clear saved progress and start the quiz over?"
   },
   "brand": {
     "walking": "Walking"

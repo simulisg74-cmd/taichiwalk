@@ -1,0 +1,367 @@
+{
+  "common": {
+    "gotIt": "Supratau",
+    "gotItExclaim": "Supratau!",
+    "great": "Puiku!",
+    "letsDoIt": "Pirmyn!",
+    "chooseAllApply": "Pasirinkite viską, kas tinka",
+    "kg": "KG",
+    "email": "El. paštas",
+    "skipQuestion": "Praleisti šį klausimą",
+    "yourEmailFallback": "jūsų el. paštą"
+  },
+  "bodyType": {
+    "title": "Kuris vaizdas geriausiai apibūdina jūsų sudėjimą?",
+    "slim": "Lieknas",
+    "mid_sized": "Vidutinis",
+    "plus_sized": "Stambesnis",
+    "overweight": "Antsvoris"
+  },
+  "dreamBody": {
+    "title": "Koks yra jūsų svajonių kūnas?",
+    "thin": "Lieknas",
+    "toned": "Stangrus",
+    "healthy": "Sveikas",
+    "curvyFemale": "Apvalus",
+    "curvyMale": "Formuotas"
+  },
+  "focus": {
+    "title": "Kuriose srityse norėtumėte sutelkti dėmesį?",
+    "subtitle": "Jūsų ėjimo planas bus orientuotas į šias sritis",
+    "legs": "Kojos",
+    "belly": "Pilvas",
+    "arms": "Rankos",
+    "chest": "Krūtinė",
+    "buttocks": "Sėdmenys",
+    "hips": "Klubai",
+    "full_body": "Visas kūnas"
+  },
+  "cellulite": {
+    "title": "Ar kovojate su celiulitu?",
+    "yes": "Taip",
+    "no": "Ne",
+    "a_little": "Truputį"
+  },
+  "bestShape": {
+    "title": "Kada buvote geriausios formos savo gyvenime?",
+    "less_than_year": "Mažiau nei prieš metus",
+    "1_to_2_years": "Prieš 1–2 metus",
+    "more_than_3": "Prieš daugiau nei 3 metus",
+    "never": "Niekada"
+  },
+  "weightFluct": {
+    "title": "Kaip apibūdintumėte svorio svyravimus?",
+    "gain_fast_lose_slow": "Priaugu greitai, bet numesti sunku",
+    "gain_lose_easily": "Lengvai priaugu ir lengvai numetu",
+    "struggle_to_gain": "Sunku priaugti svorio ar raumenų"
+  },
+  "harvard": {
+    "gazetteAlt": "The Harvard Gazette",
+    "maleTitleBefore": "Svorio metimas ir sveikata",
+    "maleBenefits": "nauda",
+    "maleTitleMid": "Tai Chi ėjimo",
+    "maleAge": "vyrams virš 50",
+    "femaleHelp": "Svorio metimas ir sveikata",
+    "femaleBenefits": "nauda",
+    "femaleTitleMid": "Tai Chi ėjimo",
+    "femaleAge": "moterims virš 50",
+    "quotePart1": "Žurnalo „Journal of Aging and Physical Activity“ studijoje nustatyta, kad Tai Chi ėjimas",
+    "quoteBold1": "20%",
+    "quotePart2": "pagerino širdies sveikatą ir padėjo",
+    "quoteBold2": "numesti 6–8% kūno svorio",
+    "quotePart3": "per 4–12 savaičių."
+  },
+  "stairs": {
+    "title": "Kaip jaučiatės užkopę laiptais?",
+    "subtitle": "Tai padės įvertinti kardiorespiracinę funkciją.",
+    "out_of_breath": "Uždūstu",
+    "sometimes_tired": "Kartais pavargstu, bet gerai",
+    "easily": "Lengvai"
+  },
+  "taiChiPromo": {
+    "title": "Rūpinkitės sveikata saugiais ir švelniais Tai Chi treniruotėmis!",
+    "body": "Mūsų Tai Chi treniruotės orientuotos į kūno pojūčius ir švelnius judesius. Tai saugesnis pasirinkimas nei didelio smūgio krūvio treniruotės tiems, kurie linkę traumoms ar diskomfortui sąnariuose."
+  },
+  "energyBalance": {
+    "title": "Nėra problemų! Subalansuosime jūsų energijos lygį",
+    "subtitle": "Savaitės energijos lygis su ėjimu",
+    "diagramAlt": "Energijos diagrama: intensyvumo kreivė su piku",
+    "body1": "Smagios ir įtraukiančios treniruotės pagerina judrumą, švelniai aktyvina raumenis ir suteikia energijos dienai!",
+    "body2": "Padidinkite energiją, ištvermę ir nuotaiką!"
+  },
+  "sleep": {
+    "title": "Kiek miegate?",
+    "maleAlt": "Vyras tempiasi lovoje pabudęs",
+    "femaleAlt": "Moteris tempiasi lovoje pabudusi",
+    "less_than_5": "Mažiau nei 5 val.",
+    "5_to_6": "5–6 val.",
+    "7_to_8": "7–8 val.",
+    "more_than_8": "Daugiau nei 8 val."
+  },
+  "walkFreq": {
+    "title": "Kaip dažnai einate pėsčiomis?",
+    "almost_daily": "Beveik kasdien",
+    "3_4_week": "3–4 kartus per savaitę",
+    "1_2_week": "1–2 kartus per savaitę",
+    "once_month": "Kartą per mėnesį ar rečiau"
+  },
+  "taiChiInfo": {
+    "title": "Tai Chi ėjimas: toks pat efektyvus kaip didelio krūvio treniruotės",
+    "p1a": "Dažnai manoma, kad ėjimas mažiau efektyvus nei bėgimas.",
+    "p1b": "Bet studijos rodo, kad",
+    "p1c": "Tai Chi ėjimas",
+    "p1d": "ypač sparčiu tempu",
+    "p1e": "gali stipriai pagerinti fitnesą",
+    "p1f": "ir bendrą savijautą.",
+    "source": "Šaltinis: „Walking for Exercise“, Harvard Nutrition Source",
+    "maleImgAlt": "Besišypsantis vyras su pakeltomis rankomis",
+    "femaleImgAlt": "Besišypsanti moteris su kilimėliu ir vandeniu"
+  },
+  "workSchedule": {
+    "title": "Koks jūsų darbo grafikas?",
+    "9_to_5": "Darbas 9–17",
+    "flexible": "Lankstus grafikas",
+    "night_shifts": "Naktinės pamainos",
+    "dont_work": "Nedirbu",
+    "stay_at_home": "Namų šeimininkas(-ė)"
+  },
+  "lifestyle": {
+    "title": "Koks aktyvus jūsų gyvenimo būdas?",
+    "subtitle": "Atsižvelgsime kuriant programą",
+    "sedentary": "Sėslus",
+    "sedentarySub": "Nesportuoju ir mažai judu",
+    "somewhat_active": "Vidutiniškai aktyvus",
+    "somewhat_activeSub": "Nesportuoju, bet daug judu",
+    "active": "Aktyvus",
+    "activeSub": "Sportuoju kelis kartus per savaitę",
+    "very_active": "Labai aktyvus",
+    "very_activeSub": "Sportuoju beveik kasdien"
+  },
+  "activities": {
+    "title": "Ar kuri nors veikla yra jūsų gyvenimo dalis?",
+    "walking_pet": "Ėjimas su augintiniu",
+    "active_time_child": "Daug aktyvaus laiko su vaiku",
+    "climbing_stairs": "Dažnas laiptų kopimas",
+    "household_tasks": "Aktyvūs namų ruošos darbai",
+    "no": "Ne"
+  },
+  "energyLevels": {
+    "title": "Kaip jaučiasi jūsų energija per dieną?",
+    "low_tired": "Žema, jaučiuosi pavargęs visą dieną",
+    "crash_lunch": "Po pietų „nukrentu“",
+    "caffeine": "Remiuosi kofeinu",
+    "high_steady": "Aukšta ir stabili visą dieną"
+  },
+  "exercisePlace": {
+    "title": "Kur mieliau sportuotumėte?",
+    "home": "Namuose",
+    "outside": "Lauke",
+    "gym": "Sporto salėje",
+    "no_preference": "Nesvarbu"
+  },
+  "lifestyleUpgrade": {
+    "title": "Sukurta pagerinti jūsų gyvenimą",
+    "body": "Pritaikysime treniruotes prie jūsų gyvenimo būdo – kad judėtumėte, augtų pasitikėjimas ir būtų smagu.",
+    "bubblesAltMale": "Vyrai ir gyvenimo akimirkos",
+    "bubblesAltFemale": "Žmonės ir gyvenimo akimirkos"
+  },
+  "walkPerWeek": {
+    "title": "Kiek kartų per savaitę norėtumėte eiti pėsčiomis?",
+    "1_2_times": "1–2 kartus",
+    "3_4_times": "3–4 kartus",
+    "5_plus_times": "5+ kartus",
+    "maleWalkAlt": "Vyras tempiasi, pasiruošęs judėti pėsčiomis",
+    "femaleWalkAlt": "Moteris su pakeltomis rankomis"
+  },
+  "dailySteps": {
+    "title": "Kiek žingsnių per dieną, jūsų nuomone, reikia?",
+    "easy": "Lengva: <5 tūkst. žingsnių",
+    "medium": "Vidutiniškai: 5–10 tūkst.",
+    "hard": "Sunku: >10 tūkst.",
+    "not_sure": "Nežinau"
+  },
+  "transformation": {
+    "titleThey": "Jiems pavyko.",
+    "titleYou": "Ir jums gali pavykti!",
+    "titleCta": "Pradėkite transformaciją šiandien!",
+    "lilyName": "Lily Morgan",
+    "noahName": "Noah Bennett",
+    "lilyQuote": "Programėlė pavertė ėjimą progresu – matau pokytį svarstyklėse ir nuotaikoje!",
+    "noahQuote": "Numečiau svorio be pastangų – tiesiog eidamas kasdien. Fitnesas pagaliau tapo smagus!",
+    "testimonialAria": "Atsiliepimas {{n}} iš {{total}}"
+  },
+  "weightGain": {
+    "title": "Ar kurie nors įvykiai prisidėjo prie svorio augimo?",
+    "titleQuiz": "Ar kurie nors šių įvykių per pastaruosius kelerius metus prisidėjo prie svorio augimo?",
+    "work_pressure": "Darbo spaudimas",
+    "busy_family": "Užimtas šeimos gyvenimas",
+    "divorce_breakup": "Skyrybos ar išsiskyrimas",
+    "slower_metabolism": "Lėtesnė medžiagų apykaita dėl amžiaus",
+    "financial": "Finansiniai iššūkiai",
+    "covid": "Covid-19 pandemija",
+    "injury_disability": "Trauma ar negalia",
+    "other_stressful": "Kiti stresiniai įvykiai",
+    "none": "Nė vieno iš aukščiau"
+  },
+  "motivation": {
+    "title": "Kokia jūsų pagrindinė motyvacija mesti svorį?",
+    "biggestMotivationTitle": "Kokia jūsų didžiausia motyvacija?",
+    "confident": "Jaustis užtikrintiau savo kūne",
+    "healthier": "Būti sveikesniam ir energingesniam",
+    "other": "Kita"
+  },
+  "longTerm": {
+    "title": "Padedame pasiekti ilgalaikius rezultatus",
+    "stanfordAlt": "Stanfordo universitetas",
+    "chartYourWeight": "JŪSŲ SVORIS",
+    "chartToday": "Šiandien",
+    "chartMonth": "Per mėnesį",
+    "chartExhausting": "Su išsekusiomis treniruotėmis",
+    "chartTaiChi": "Su Tai Chi ėjimu",
+    "drQuote": "Dr. Nick Smeeton iš Stanfordo universiteto",
+    "drQuoteBody": "nurodė, kad Tai Chi ėjimas mažina nuovargį, gerina emocinę būklę ir mažiau apkrauna kūną nei intensyvios salės treniruotės."
+  },
+  "height": {
+    "title": "Koks jūsų ūgis?",
+    "subtitle": "Planas kuriamas pagal kūno masės indeksą (KMI)"
+  },
+  "currentWeight": {
+    "title": "Dabartinis svoris",
+    "subtitle": "Naudosime KMI skaičiavimui"
+  },
+  "goalWeight": {
+    "title": "Tikslinis svoris",
+    "subtitle": "Koks idealus svoris, kurį norite pasiekti?"
+  },
+  "profile": {
+    "title": "Jūsų ėjimo profilis",
+    "loadingLabel": "Eiga",
+    "loadingStep1": "Analizuojame jūsų atsakymus…",
+    "loadingStep2": "Skaičiuojame KMI…",
+    "loadingStep3": "Vertiname sveikatos rizikas…",
+    "loadingStep4": "Kuriame jūsų ėjimo profilį…",
+    "bmiHeading": "Kūno masės indeksas (KMI)",
+    "youTooltip": "Jūs – {{bmi}}",
+    "bmiUnderweight": "NORMOS ŽEMIAU",
+    "bmiNormal": "NORMALUS",
+    "bmiOverweight": "ANTSVORIS",
+    "bmiObese": "Nutukimas",
+    "bandUnderweight": "Nepakankamas svoris",
+    "bandNormal": "Normalus",
+    "bandOverweight": "Antsvoris",
+    "bandObese": "Nutukimas",
+    "riskTitle": "Nesveiko KMI rizikos:",
+    "riskBody": "Padidėjęs kraujospūdis, lėtiniai nugaros ir sąnarių skausmai",
+    "desiredWeight": "Tikslinis svoris",
+    "bodyDream": "Svajonių kūnas",
+    "lifestyle": "Gyvenimo būdas",
+    "figureAltMale": "Vyriškas siluetas, atitinkantis antsvorio KMI",
+    "figureAltFemale": "Moteriškas siluetas, atitinkantis antsvorio KMI",
+    "walkingProfilePhotoAlt": "Besišypsanti moteris sportine apranga — jūsų ėjimo profilis"
+  },
+  "motivationEvent": {
+    "title": "Ar konkretus įvykis motyvuoja numesti svorį dabar?",
+    "vacation": "Atostogos",
+    "wedding": "Vestuvės",
+    "sports_event": "Sporto renginys",
+    "summer": "Vasara",
+    "school_reunion": "Mokyklos susitikimas",
+    "family_gathering": "Šeimos susibūrimas",
+    "birthday_party": "Gimtadienis",
+    "other_occasion": "Kita proga",
+    "no_just_ready": "Ne — tiesiog noriu atrodyti ir jaustis geriausiai!"
+  },
+  "eventDate": {
+    "title": "Skamba įdomiai! Kada įvykis?",
+    "subtitle": "Naudosime personalizuotam planui",
+    "eventDateSr": "Įvykio data"
+  },
+  "prediction": {
+    "titleYouCan": "Galite pasiekti",
+    "titleBy": "iki",
+    "basedOn": "Remiantis panašių Walking narių duomenimis",
+    "months": "sausio,vasario,kovo,balandžio,gegužės,birželio,liepos,rugpjūčio,rugsėjo,spalio,lapkričio,gruodžio",
+    "subPillRich": "ir iki <season>{{seasonName}}</season> numesite apie {{rate}} kg",
+    "season": {
+      "spring": "pavasario!",
+      "summer": "vasaros!",
+      "autumn": "rudens!",
+      "winter": "žiemos!"
+    },
+    "chartAria": "Svorio prognozė nuo {{from}} kg iki {{to}} kg",
+    "weightLossTotal": "numesti {{kg}} kg"
+  },
+  "reachConfidence": {
+    "titleBefore": "Kiek pasitikite, kad pasieksite",
+    "titleMid": "iki",
+    "titleAfter": "?",
+    "believe": "Tikiu, kad galiu!",
+    "uncertain_try": "Nesu tikras, bet išbandysiu!",
+    "not_sure": "Nežinau"
+  },
+  "giveUp": {
+    "title": "Kodėl žmonės meta sportą?",
+    "line1": "Svarbiausia",
+    "reasonHash": "#1 priežastis",
+    "line2": "— per didelis ir per greitas startas.",
+    "body": "Todėl mūsų programa padeda daryti tvarius pokyčius: transformuoti kūną ir ilgam išlaikyti sveikatą."
+  },
+  "emailStep": {
+    "title38": "Gaukite personalizuotą programą",
+    "subtitle38": "Įveskite el. paštą – atsiųsime jūsų Tai Chi ėjimo planą",
+    "placeholder38": "jusu@pastas.lt",
+    "invalidEmail": "Įveskite teisingą el. pašto adresą.",
+    "emailOk": "El. paštas atrodo gerai.",
+    "title45a": "Įveskite el. paštą ir gaukite",
+    "title45b": "Tai Chi ėjimo planą",
+    "placeholder45": "El. paštas",
+    "privacy": "Gerbiame jūsų privatumą. Atsiųsime planą el. paštu patogiam prieigai."
+  },
+  "inbox": {
+    "title": "Patikrinkite paštą!",
+    "body": "Personalizuotą planą išsiuntėme į",
+    "bodyEnd": "Vykdykite nurodymus ir pradėkite transformaciją šiandien!"
+  },
+  "reward": {
+    "titleBefore": "Pasiekus tikslinį svorį, kaip save",
+    "titleAccent": "apdovanotumėte",
+    "titleAfter": "?",
+    "new_clothes": "Nusipirkčiau naujus drabužius",
+    "personal_day": "Skirčiau sau dieną",
+    "social_media": "Pasidalinčiau socialiniuose tinkluose",
+    "pictures": "Fotografuočiausi",
+    "travel": "Nuvažiuočiau kažkur nauja"
+  },
+  "seeYourself": {
+    "titleBefore": "Kaip save",
+    "titleAccent": "matytumėte",
+    "titleAfter": "pasiekę tikslinį svorį?",
+    "proud": "Didžiuodamasis savimi",
+    "feeling_great": "Jausdamasis puikiai",
+    "believe": "Tikėdamasis savimi",
+    "empowered": "Jausdamasis stiprus priimti sveikus sprendimus",
+    "worry_less": "Mažiau nerimčiau dėl kūno"
+  },
+  "planBuild": {
+    "creating": "Kuriame jūsų personalizuotą Walking planą",
+    "million": "10 milijonų žmonių",
+    "chosen": " pasirinko Walking",
+    "rachelUser": "Rachel999",
+    "rachelQuote": "Per savaitę -4 svarai. Atrodo lengva, bet tai super kalorijų deginimas. Ėjimas padeda būti aktyvesniam ir laimingesniam!",
+    "rachelAlt": "Rachel"
+  },
+  "optIn": {
+    "titleBefore": "Ar norite gauti el. laiškus su",
+    "titleAccent": "svorio metimo",
+    "titleAfter": "patarimais ir programėlės naujienomis?",
+    "yes": "Taip, noriu",
+    "no": "Nenoriu gauti patarimų ar naujienų"
+  },
+  "nameStep": {
+    "title": "Koks jūsų vardas?",
+    "subtitle": "Parašykite, kaip norite, kad kreiptumės",
+    "placeholder": "Vardas",
+    "nameSr": "Jūsų vardas"
+  },
+  "seniorCoupleAlt": "Aktyvi vyresnio amžiaus pora po ėjimo"
+}

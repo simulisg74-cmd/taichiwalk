@@ -10,7 +10,7 @@ import { getQuizAsset } from '../quiz/quizAssets';
  *   gender: string,
  *   progressPercent: number,
  *   onBack: () => void,
- *   onMenu: () => void,
+ *   onMenu?: () => void,
  *   onContinue: () => void,
  * }} props
  */
@@ -40,45 +40,53 @@ export function StepTrustHero({ step, design, gender, progressPercent, onBack, o
         <div className="flex justify-center">
           <WalkingIcon showLabel size="md" />
         </div>
-        <button
-          type="button"
-          onClick={onMenu}
-          className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-gray-600 transition-colors hover:bg-gray-100"
-          aria-label={t('common.menu')}
-        >
-          <List size={24} weight="bold" className="text-gray-600" />
-        </button>
+        {onMenu ? (
+          <button
+            type="button"
+            onClick={onMenu}
+            className="flex h-10 w-10 items-center justify-center justify-self-end rounded-full text-gray-600 transition-colors hover:bg-gray-100"
+            aria-label={t('common.menu')}
+          >
+            <List size={24} weight="bold" className="text-gray-600" />
+          </button>
+        ) : (
+          <span className="justify-self-end" aria-hidden />
+        )}
       </header>
 
       <div className={th.progressTrack}>
         <div className={th.progressFill} style={{ width: `${progressPercent}%` }} />
       </div>
 
-      <div className="flex min-h-[calc(100vh-120px)] w-full min-w-0 flex-col items-center justify-center overflow-x-clip px-5 py-8 sm:px-8">
-        <div className="flex w-full max-w-3xl flex-col items-center gap-12 sm:max-w-4xl md:max-w-6xl md:flex-row md:items-center md:justify-center md:gap-20">
+      <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-y-auto overflow-x-clip px-5 py-6 sm:px-8 sm:py-8">
+        <div className="flex w-full max-w-3xl flex-col items-center gap-8 sm:max-w-4xl sm:gap-12 md:max-w-6xl md:flex-row md:items-center md:justify-center md:gap-20">
           <div className="min-w-0 flex-1 text-center md:max-w-[min(100%,40rem)] md:text-left">
-            <div className="flex flex-wrap items-center justify-center gap-3 md:justify-start md:gap-4">
-              <img
-                src={laurelSrc}
-                alt=""
-                className="h-[4.5rem] w-auto shrink-0 object-contain sm:h-20"
-                width={42}
-                height={72}
-                aria-hidden
-              />
-              <h2 className="text-2xl font-bold leading-tight tracking-tight text-gray-900 sm:text-4xl md:text-5xl">
+            <div className="flex min-w-0 w-full max-w-full flex-wrap items-center justify-center gap-2 overflow-x-clip sm:gap-3 md:justify-start md:gap-4">
+              <span className="inline-flex h-12 w-[2.125rem] shrink-0 items-center justify-center overflow-hidden sm:h-[4.5rem] sm:w-[2.625rem] md:h-20">
+                <img
+                  src={laurelSrc}
+                  alt=""
+                  className="h-full w-full max-w-none object-contain object-center"
+                  width={42}
+                  height={72}
+                  aria-hidden
+                />
+              </span>
+              <h2 className="min-w-0 max-w-full break-words text-2xl font-bold leading-tight tracking-tight text-gray-900 sm:text-4xl md:text-5xl">
                 {t(headlineKey ?? '')}
               </h2>
-              <img
-                src={laurelSrc}
-                alt=""
-                className="h-[4.5rem] w-auto shrink-0 -scale-x-100 object-contain sm:h-20"
-                width={42}
-                height={72}
-                aria-hidden
-              />
+              <span className="inline-flex h-12 w-[2.125rem] shrink-0 items-center justify-center overflow-hidden sm:h-[4.5rem] sm:w-[2.625rem] md:h-20">
+                <img
+                  src={laurelSrc}
+                  alt=""
+                  className="h-full w-full max-w-none -scale-x-100 object-contain object-center"
+                  width={42}
+                  height={72}
+                  aria-hidden
+                />
+              </span>
             </div>
-            <p className="mt-4 text-base font-normal leading-snug text-gray-600 sm:text-xl">
+            <p className="mt-4 w-full text-center text-base font-normal leading-snug text-gray-600 sm:text-xl">
               {sublineKey ? (
                 <Trans
                   i18nKey={sublineKey}
@@ -99,7 +107,7 @@ export function StepTrustHero({ step, design, gender, progressPercent, onBack, o
         </div>
       </div>
 
-      <div className="relative z-10 flex justify-center px-6 pb-[calc(2rem+env(safe-area-inset-bottom,0px))] pt-4">
+      <div className="relative z-10 flex shrink-0 justify-center border-t border-amber-200/50 bg-[#f3e9dc]/95 px-6 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] backdrop-blur-sm">
         <button type="button" onClick={onContinue} className={design.buttons.continue}>
           {t(i18nKeys.continueKey ?? 'quiz.common.continue')}
         </button>
